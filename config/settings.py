@@ -1,6 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
-
+# pyrefly: ignore [missing-import]
 from decouple import Csv, config
 
 
@@ -37,14 +37,12 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'apps.authentication',
+    'apps.accounts',
     'apps.customers',
     'apps.dashboard',
     'apps.inventory',
     'apps.reports',
     'apps.sales',
-    'apps.settings_app',
-    'apps.suppliers',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -80,15 +78,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-DB_ENGINE = config('DB_ENGINE', default='sqlite')
+DB_ENGINE = config('DB_ENGINE', default='postgresql')
 
 if DB_ENGINE == 'postgresql':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('POSTGRES_DB', default='boskepos'),
-            'USER': config('POSTGRES_USER', default='postgres'),
-            'PASSWORD': config('POSTGRES_PASSWORD', default='postgres'),
+            'NAME': config('POSTGRES_DB', default='boskepos_db'),
+            'USER': config('POSTGRES_USER', default='boskepos_user'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
             'HOST': config('POSTGRES_HOST', default='localhost'),
             'PORT': config('POSTGRES_PORT', default='5432'),
         }

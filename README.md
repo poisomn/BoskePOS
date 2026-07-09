@@ -1,6 +1,6 @@
 ﻿# BoskePOS
 
-Monorepo inicial para un POS con Django REST Framework y React + Vite + Tailwind.
+Monorepo inicial para un POS con Django 6, Django REST Framework, PostgreSQL y React + Vite + Tailwind.
 
 ## Backend
 
