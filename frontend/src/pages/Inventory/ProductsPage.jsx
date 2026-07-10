@@ -12,6 +12,7 @@ import {
   updateProduct,
 } from '../../services/inventoryService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
+import { formatMoney } from '../../utils/formatters'
 import InventoryHeader from './InventoryHeader'
 import ProductForm from './ProductForm'
 
@@ -104,12 +105,69 @@ function ProductsPage() {
   }
 
   const columns = [
-    { key: 'sku', header: 'SKU' },
-    { key: 'name', header: 'Producto' },
+    {
+      key: 'product',
+      header: 'Producto',
+      render: (product) => (
+        <div className="flex min-w-64 items-center gap-3">
+          {product.image ? (
+            <img
+              alt=""
+              className="size-10 rounded-md border object-cover"
+              src={product.image}
+              style={{ borderColor: 'var(--color-border)' }}
+            />
+          ) : (
+            <div
+              className="grid size-10 place-items-center rounded-md border text-xs font-semibold"
+              style={{
+                background: 'var(--color-steel-50)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-steel-600)',
+              }}
+            >
+              {getProductInitials(product.name)}
+            </div>
+          )}
+          <div>
+            <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
+              {product.name}
+            </p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              {product.brand || 'Sin marca'}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'sku',
+      header: 'SKU',
+      render: (product) => <span className="font-mono text-xs font-semibold">{product.sku}</span>,
+    },
+    {
+      key: 'barcode',
+      header: 'Codigo',
+      render: (product) => (
+        <span className="font-mono text-xs">{product.barcode || 'Sin codigo'}</span>
+      ),
+    },
     {
       key: 'category',
       header: 'Categoria',
       render: (product) => product.category_detail?.name ?? 'Sin categoria',
+    },
+    {
+      key: 'storage',
+      header: 'Unidad / Ubicacion',
+      render: (product) => (
+        <div className="space-y-1">
+          <span className="badge badge-info">{formatUnit(product.unit)}</span>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {product.location || 'Sin ubicacion'}
+          </p>
+        </div>
+      ),
     },
     {
       key: 'stock',
@@ -122,8 +180,15 @@ function ProductsPage() {
     },
     {
       key: 'sale_price',
-      header: 'Precio',
-      render: (product) => formatMoney(product.sale_price),
+      header: 'Precio venta',
+      render: (product) => (
+        <div>
+          <p className="font-semibold">{formatMoney(product.sale_price)}</p>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            IVA {product.tax_rate ?? '19.00'}%
+          </p>
+        </div>
+      ),
     },
     {
       key: 'is_active',
@@ -199,12 +264,29 @@ function ProductsPage() {
   )
 }
 
-function formatMoney(value) {
-  return new Intl.NumberFormat('es-CL', {
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-    style: 'currency',
-  }).format(Number(value))
+function formatUnit(value) {
+  const labels = {
+    bolsa: 'Bolsa',
+    caja: 'Caja',
+    kilo: 'Kilo',
+    litro: 'Litro',
+    metro: 'Metro',
+    par: 'Par',
+    rollo: 'Rollo',
+    unidad: 'Unidad',
+  }
+
+  return labels[value] ?? 'Unidad'
+}
+
+function getProductInitials(name = '') {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase() || 'PR'
 }
 
 export default ProductsPage

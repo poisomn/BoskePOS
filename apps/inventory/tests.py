@@ -57,6 +57,11 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(create_response.data['sku'], 'PIN-001')
         self.assertIsNone(create_response.data['barcode'])
+        self.assertEqual(create_response.data['brand'], '')
+        self.assertEqual(create_response.data['unit'], Product.ProductUnit.UNIT)
+        self.assertEqual(create_response.data['location'], '')
+        self.assertIsNone(create_response.data['image'])
+        self.assertEqual(create_response.data['tax_rate'], '19.00')
 
         product_id = create_response.data['id']
         detail_url = reverse('inventory:product-detail', args=[product_id])
@@ -122,3 +127,54 @@ class InventoryApiTests(APITestCase):
         )
         self.assertEqual(duplicate_barcode_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('barcode', duplicate_barcode_response.data)
+
+    def test_product_can_be_created_with_brand_unit_and_location(self):
+        category = Category.objects.create(name='Herramientas Electricas')
+
+        response = self.client.post(
+            reverse('inventory:product-list'),
+            {
+                'category': category.id,
+                'name': 'Taladro percutor 650W',
+                'sku': 'tal-001',
+                'barcode': '780000000010',
+                'brand': 'Bosch',
+                'unit': Product.ProductUnit.UNIT,
+                'location': 'A-01-01',
+                'cost_price': '34990.00',
+                'sale_price': '49990.00',
+                'stock': 7,
+                'minimum_stock': 2,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['brand'], 'Bosch')
+        self.assertEqual(response.data['unit'], Product.ProductUnit.UNIT)
+        self.assertEqual(response.data['location'], 'A-01-01')
+        self.assertIsNone(response.data['image'])
+
+    def test_product_tax_rate_defaults_to_19_percent(self):
+        product = Product.objects.create(
+            name='Producto con IVA por defecto',
+            sku='IVA-001',
+            sale_price=Decimal('1000.00'),
+        )
+
+        self.assertEqual(product.tax_rate, Decimal('19.00'))
+
+    def test_product_rejects_invalid_unit(self):
+        response = self.client.post(
+            reverse('inventory:product-list'),
+            {
+                'name': 'Producto unidad invalida',
+                'sku': 'UNI-001',
+                'unit': 'metros',
+                'sale_price': '1000.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('unit', response.data)

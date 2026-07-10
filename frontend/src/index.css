@@ -190,7 +190,7 @@ select {
   }
 
   .table-wrap {
-    @apply overflow-hidden border bg-white;
+    @apply overflow-x-auto border bg-white;
     border-color: var(--color-border);
     border-radius: var(--radius-lg);
   }
@@ -270,7 +270,7 @@ select {
   }
 
   .modal-panel {
-    @apply w-full max-w-lg border bg-white p-5;
+    @apply max-h-[90svh] w-full max-w-3xl overflow-y-auto border bg-white p-5;
     border-color: var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-modal);

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Category, Product
 
@@ -12,6 +13,26 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'sku', 'barcode', 'category', 'sale_price', 'stock', 'is_active')
-    list_filter = ('is_active', 'category')
-    search_fields = ('name', 'sku', 'barcode')
+    list_display = (
+        'image_preview',
+        'name',
+        'category',
+        'brand',
+        'sku',
+        'stock',
+        'unit',
+        'location',
+        'sale_price',
+    )
+    list_filter = ('is_active', 'category', 'brand', 'unit', 'tax_rate')
+    search_fields = ('name', 'sku', 'barcode', 'brand')
+
+    @admin.display(description='Image')
+    def image_preview(self, obj):
+        if not obj.image:
+            return '-'
+
+        return format_html(
+            '<img src="{}" style="height: 40px; width: 40px; object-fit: cover; border-radius: 4px;" />',
+            obj.image.url,
+        )

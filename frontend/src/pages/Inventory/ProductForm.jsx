@@ -1,13 +1,28 @@
 import { useState } from 'react'
 
+const PRODUCT_UNITS = [
+  { label: 'Unidad', value: 'unidad' },
+  { label: 'Metro', value: 'metro' },
+  { label: 'Kilo', value: 'kilo' },
+  { label: 'Litro', value: 'litro' },
+  { label: 'Caja', value: 'caja' },
+  { label: 'Bolsa', value: 'bolsa' },
+  { label: 'Rollo', value: 'rollo' },
+  { label: 'Par', value: 'par' },
+]
+
 const initialState = {
   category: '',
   name: '',
   sku: '',
   barcode: '',
+  brand: '',
+  unit: 'unidad',
+  location: '',
   description: '',
   cost_price: '0.00',
   sale_price: '',
+  tax_rate: '19.00',
   stock: '0',
   minimum_stock: '0',
   is_active: true,
@@ -29,9 +44,13 @@ function ProductForm({ categories, isSubmitting, onCancel, onSubmit, product }) 
       name: formData.name.trim(),
       sku: formData.sku.trim(),
       barcode: formData.barcode.trim() || null,
+      brand: formData.brand.trim(),
+      unit: formData.unit,
+      location: formData.location.trim(),
       description: formData.description.trim(),
       cost_price: formData.cost_price || '0.00',
       sale_price: formData.sale_price,
+      tax_rate: formData.tax_rate || '19.00',
       stock: Number(formData.stock),
       minimum_stock: Number(formData.minimum_stock),
       is_active: formData.is_active,
@@ -62,6 +81,16 @@ function ProductForm({ categories, isSubmitting, onCancel, onSubmit, product }) 
         </label>
 
         <label>
+          <span className="field-label">Marca</span>
+          <input
+            className="input"
+            onChange={(event) => updateField('brand', event.target.value)}
+            placeholder="Ej: Bosch, Makita, 3M"
+            value={formData.brand}
+          />
+        </label>
+
+        <label>
           <span className="field-label">Categoria</span>
           <select
             className="select"
@@ -87,6 +116,32 @@ function ProductForm({ categories, isSubmitting, onCancel, onSubmit, product }) 
         </label>
 
         <label>
+          <span className="field-label">Unidad</span>
+          <select
+            className="select"
+            onChange={(event) => updateField('unit', event.target.value)}
+            required
+            value={formData.unit}
+          >
+            {PRODUCT_UNITS.map((unit) => (
+              <option key={unit.value} value={unit.value}>
+                {unit.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span className="field-label">Ubicacion</span>
+          <input
+            className="input"
+            onChange={(event) => updateField('location', event.target.value)}
+            placeholder="Ej: A-01-01"
+            value={formData.location}
+          />
+        </label>
+
+        <label>
           <span className="field-label">Costo</span>
           <input
             className="input"
@@ -108,6 +163,19 @@ function ProductForm({ categories, isSubmitting, onCancel, onSubmit, product }) 
             step="0.01"
             type="number"
             value={formData.sale_price}
+          />
+        </label>
+
+        <label>
+          <span className="field-label">IVA (%)</span>
+          <input
+            className="input"
+            min="0"
+            onChange={(event) => updateField('tax_rate', event.target.value)}
+            required
+            step="0.01"
+            type="number"
+            value={formData.tax_rate}
           />
         </label>
 
@@ -171,9 +239,13 @@ function mapProductToForm(product) {
     name: product.name ?? '',
     sku: product.sku ?? '',
     barcode: product.barcode ?? '',
+    brand: product.brand ?? '',
+    unit: product.unit ?? 'unidad',
+    location: product.location ?? '',
     description: product.description ?? '',
     cost_price: product.cost_price ?? '0.00',
     sale_price: product.sale_price ?? '',
+    tax_rate: product.tax_rate ?? '19.00',
     stock: String(product.stock ?? 0),
     minimum_stock: String(product.minimum_stock ?? 0),
     is_active: Boolean(product.is_active),

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.core.validators import MinValueValidator
 
@@ -19,6 +21,16 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    class ProductUnit(models.TextChoices):
+        UNIT = 'unidad', 'Unidad'
+        METER = 'metro', 'Metro'
+        KILOGRAM = 'kilo', 'Kilogramo'
+        LITER = 'litro', 'Litro'
+        BOX = 'caja', 'Caja'
+        BAG = 'bolsa', 'Bolsa'
+        ROLL = 'rollo', 'Rollo'
+        PAIR = 'par', 'Par'
+
     category = models.ForeignKey(
         Category,
         related_name='products',
@@ -29,6 +41,14 @@ class Product(models.Model):
     name = models.CharField(max_length=180)
     sku = models.CharField(max_length=64, unique=True)
     barcode = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    brand = models.CharField(max_length=100, blank=True, default='')
+    unit = models.CharField(
+        max_length=20,
+        choices=ProductUnit.choices,
+        default=ProductUnit.UNIT,
+    )
+    location = models.CharField(max_length=50, blank=True, default='')
+    image = models.ImageField(upload_to='products/', blank=True, null=True)
     description = models.TextField(blank=True)
     cost_price = models.DecimalField(
         max_digits=12,
@@ -39,6 +59,10 @@ class Product(models.Model):
     sale_price = models.DecimalField(
         max_digits=12,
         decimal_places=2,
+        validators=[MinValueValidator(0)],
+    )
+    tax_rate = models.IntegerField(
+        default=(19),
         validators=[MinValueValidator(0)],
     )
     stock = models.PositiveIntegerField(default=0)
