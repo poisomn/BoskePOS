@@ -68,15 +68,27 @@ class ProductSerializer(serializers.ModelSerializer):
             'barcode': {'validators': []},
         }
 
+    def validate_name(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError('El nombre del producto es obligatorio.')
+
+        return value
+
     def validate_sku(self, value):
         value = value.strip().upper()
+
+        if not value:
+            raise serializers.ValidationError('El SKU del producto es obligatorio.')
+
         queryset = Product.objects.filter(sku=value)
 
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise serializers.ValidationError('A product with this SKU already exists.')
+            raise serializers.ValidationError('Ya existe un producto con este SKU.')
 
         return value
 
@@ -94,6 +106,12 @@ class ProductSerializer(serializers.ModelSerializer):
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise serializers.ValidationError('A product with this barcode already exists.')
+            raise serializers.ValidationError('Ya existe un producto con este codigo de barras.')
+
+        return value
+
+    def validate_category(self, value):
+        if value and not value.is_active:
+            raise serializers.ValidationError('No se puede asignar una categoria inactiva.')
 
         return value

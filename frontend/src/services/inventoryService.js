@@ -83,6 +83,59 @@ export async function listProducts(search = '') {
   return normalizeListResponse(data)
 }
 
+export async function listProductsPage({
+  barcode = '',
+  category = '',
+  isActive = '',
+  lowStock = false,
+  outOfStock = false,
+  page = 1,
+  pageSize = 8,
+  search = '',
+  sku = '',
+} = {}) {
+  const params = {
+    page,
+    page_size: pageSize,
+  }
+
+  if (search) {
+    params.search = search
+  }
+
+  if (category) {
+    params.category = category
+  }
+
+  if (isActive !== '') {
+    params.is_active = isActive
+  }
+
+  if (lowStock) {
+    params.low_stock = 'true'
+  }
+
+  if (outOfStock) {
+    params.out_of_stock = 'true'
+  }
+
+  if (sku) {
+    params.sku = sku
+  }
+
+  if (barcode) {
+    params.barcode = barcode
+  }
+
+  const { data } = await http.get('/inventory/products/', { params })
+  return normalizePaginatedResponse(data)
+}
+
+export async function getProduct(id) {
+  const { data } = await http.get(`/inventory/products/${id}/`)
+  return data
+}
+
 export async function createProduct(payload) {
   const { data } = await http.post('/inventory/products/', payload)
   return data
@@ -95,4 +148,14 @@ export async function updateProduct(id, payload) {
 
 export async function deleteProduct(id) {
   await http.delete(`/inventory/products/${id}/`)
+}
+
+export async function activateProduct(id) {
+  const { data } = await http.post(`/inventory/products/${id}/activate/`)
+  return data
+}
+
+export async function deactivateProduct(id) {
+  const { data } = await http.post(`/inventory/products/${id}/deactivate/`)
+  return data
 }

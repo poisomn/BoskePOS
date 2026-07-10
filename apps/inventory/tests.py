@@ -210,8 +210,8 @@ class InventoryApiTests(APITestCase):
         response = self.client.get(reverse('inventory:product-list'), {'search': 'martillo'})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['name'], 'Martillo carpintero')
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Martillo carpintero')
 
     def test_product_sku_must_be_unique(self):
         Product.objects.create(name='Producto base', sku='SKU-001', sale_price=Decimal('1000'))
@@ -284,6 +284,251 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(response.data['unit'], Product.ProductUnit.UNIT)
         self.assertEqual(response.data['location'], 'A-01-01')
         self.assertIsNone(response.data['image'])
+
+    def test_product_list_is_paginated(self):
+        for index in range(9):
+            Product.objects.create(
+                name=f'Producto {index:02d}',
+                sku=f'PAG-{index:02d}',
+                sale_price=Decimal('1000.00'),
+            )
+
+        response = self.client.get(reverse('inventory:product-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 9)
+        self.assertEqual(len(response.data['results']), 8)
+        self.assertIsNotNone(response.data['next'])
+
+    def test_product_list_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse('inventory:product-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_product_name_and_sku_are_normalized(self):
+        response = self.client.post(
+            reverse('inventory:product-list'),
+            {
+                'name': '  Martillo carpintero  ',
+                'sku': ' fer-100 ',
+                'sale_price': '3990.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['name'], 'Martillo carpintero')
+        self.assertEqual(response.data['sku'], 'FER-100')
+
+    def test_product_name_and_sku_are_required_after_trim(self):
+        name_response = self.client.post(
+            reverse('inventory:product-list'),
+            {'name': '   ', 'sku': 'REQ-001', 'sale_price': '1000.00'},
+            format='json',
+        )
+        sku_response = self.client.post(
+            reverse('inventory:product-list'),
+            {'name': 'Producto sin SKU', 'sku': '   ', 'sale_price': '1000.00'},
+            format='json',
+        )
+
+        self.assertEqual(name_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', name_response.data)
+        self.assertEqual(sku_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('sku', sku_response.data)
+
+    def test_product_search_by_sku_and_barcode(self):
+        Product.objects.create(
+            name='Producto buscable',
+            sku='BUS-001',
+            barcode='001234567890',
+            sale_price=Decimal('1000.00'),
+        )
+        Product.objects.create(
+            name='Producto secundario',
+            sku='BUS-002',
+            barcode='009999999999',
+            sale_price=Decimal('1000.00'),
+        )
+
+        sku_response = self.client.get(reverse('inventory:product-list'), {'search': 'bus-001'})
+        barcode_response = self.client.get(
+            reverse('inventory:product-list'),
+            {'search': '001234567890'},
+        )
+
+        self.assertEqual(sku_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(sku_response.data['count'], 1)
+        self.assertEqual(sku_response.data['results'][0]['sku'], 'BUS-001')
+        self.assertEqual(barcode_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(barcode_response.data['count'], 1)
+        self.assertEqual(barcode_response.data['results'][0]['barcode'], '001234567890')
+
+    def test_product_filters_by_category_state_and_low_stock(self):
+        category = Category.objects.create(name='Herramientas')
+        other_category = Category.objects.create(name='Pinturas')
+        Product.objects.create(
+            category=category,
+            name='Stock bajo',
+            sku='LOW-001',
+            sale_price=Decimal('1000.00'),
+            stock=2,
+            minimum_stock=2,
+            is_active=True,
+        )
+        Product.objects.create(
+            category=other_category,
+            name='Stock normal',
+            sku='LOW-002',
+            sale_price=Decimal('1000.00'),
+            stock=10,
+            minimum_stock=2,
+            is_active=False,
+        )
+
+        category_response = self.client.get(
+            reverse('inventory:product-list'),
+            {'category': category.id},
+        )
+        active_response = self.client.get(
+            reverse('inventory:product-list'),
+            {'is_active': 'false'},
+        )
+        low_stock_response = self.client.get(
+            reverse('inventory:product-list'),
+            {'low_stock': 'true'},
+        )
+
+        self.assertEqual(category_response.data['count'], 1)
+        self.assertEqual(category_response.data['results'][0]['sku'], 'LOW-001')
+        self.assertEqual(active_response.data['count'], 1)
+        self.assertEqual(active_response.data['results'][0]['sku'], 'LOW-002')
+        self.assertEqual(low_stock_response.data['count'], 1)
+        self.assertEqual(low_stock_response.data['results'][0]['sku'], 'LOW-001')
+
+    def test_product_exact_filters_by_sku_and_barcode(self):
+        Product.objects.create(
+            name='Producto exacto',
+            sku='EXA-001',
+            barcode='000000000001',
+            sale_price=Decimal('1000.00'),
+        )
+        Product.objects.create(
+            name='Producto exacto dos',
+            sku='EXA-002',
+            barcode='000000000002',
+            sale_price=Decimal('1000.00'),
+        )
+
+        sku_response = self.client.get(reverse('inventory:product-list'), {'sku': ' exa-001 '})
+        barcode_response = self.client.get(
+            reverse('inventory:product-list'),
+            {'barcode': ' 000000000002 '},
+        )
+
+        self.assertEqual(sku_response.data['count'], 1)
+        self.assertEqual(sku_response.data['results'][0]['sku'], 'EXA-001')
+        self.assertEqual(barcode_response.data['count'], 1)
+        self.assertEqual(barcode_response.data['results'][0]['barcode'], '000000000002')
+
+    def test_product_rejects_negative_prices_and_stock(self):
+        payload = {
+            'name': 'Producto invalido',
+            'sku': 'NEG-001',
+            'cost_price': '-1.00',
+            'sale_price': '-1.00',
+            'stock': -1,
+            'minimum_stock': -1,
+        }
+
+        response = self.client.post(
+            reverse('inventory:product-list'),
+            payload,
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('cost_price', response.data)
+        self.assertIn('sale_price', response.data)
+        self.assertIn('stock', response.data)
+        self.assertIn('minimum_stock', response.data)
+
+    def test_product_rejects_inactive_category(self):
+        category = Category.objects.create(name='Categoria inactiva', is_active=False)
+
+        response = self.client.post(
+            reverse('inventory:product-list'),
+            {
+                'category': category.id,
+                'name': 'Producto con categoria inactiva',
+                'sku': 'CAT-INACTIVE-001',
+                'sale_price': '1000.00',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('category', response.data)
+
+    def test_product_can_be_partially_updated(self):
+        product = Product.objects.create(
+            name='Producto base',
+            sku='PATCH-001',
+            sale_price=Decimal('1000.00'),
+        )
+
+        response = self.client.patch(
+            reverse('inventory:product-detail', args=[product.id]),
+            {'name': ' Producto editado ', 'barcode': ' 000000123456 '},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Producto editado')
+        self.assertEqual(response.data['barcode'], '000000123456')
+
+    def test_product_activate_and_deactivate(self):
+        product = Product.objects.create(
+            name='Producto activable',
+            sku='ACT-001',
+            sale_price=Decimal('1000.00'),
+            is_active=True,
+        )
+
+        deactivate_response = self.client.post(
+            reverse('inventory:product-deactivate', args=[product.id]),
+            format='json',
+        )
+        activate_response = self.client.post(
+            reverse('inventory:product-activate', args=[product.id]),
+            format='json',
+        )
+
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(deactivate_response.data['is_active'])
+        self.assertEqual(activate_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(activate_response.data['is_active'])
+
+    def test_product_detail_not_found(self):
+        response = self.client.get(reverse('inventory:product-detail', args=[99999]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_product_list_uses_select_related_for_category(self):
+        category = Category.objects.create(name='Categoria consulta')
+        Product.objects.create(
+            category=category,
+            name='Producto consulta',
+            sku='SQL-001',
+            sale_price=Decimal('1000.00'),
+        )
+
+        with self.assertNumQueries(2):
+            response = self.client.get(reverse('inventory:product-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_product_tax_rate_defaults_to_19_percent(self):
         product = Product.objects.create(

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiEdit2, FiPower, FiRefreshCw } from 'react-icons/fi'
 
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
 import {
+  activateProduct,
   createProduct,
-  deleteProduct,
-  listCategories,
-  listProducts,
+  deactivateProduct,
+  listCategoriesPage,
+  listProductsPage,
   updateProduct,
 } from '../../services/inventoryService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
@@ -20,15 +21,21 @@ const PAGE_SIZE = 8
 
 function ProductsPage() {
   const [categories, setCategories] = useState([])
+  const [categoryFilter, setCategoryFilter] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [isActiveFilter, setIsActiveFilter] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLowStockFilter, setIsLowStockFilter] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [page, setPage] = useState(1)
-  const [productToDelete, setProductToDelete] = useState(null)
+  const [productToDeactivate, setProductToDeactivate] = useState(null)
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [total, setTotal] = useState(0)
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
@@ -36,69 +43,131 @@ function ProductsPage() {
 
     try {
       const [productsData, categoriesData] = await Promise.all([
-        listProducts(search),
-        listCategories(),
+        listProductsPage({
+          category: categoryFilter,
+          isActive: isActiveFilter,
+          lowStock: isLowStockFilter,
+          page,
+          pageSize: PAGE_SIZE,
+          search,
+        }),
+        listCategoriesPage({ pageSize: 100 }),
       ])
-      setProducts(productsData)
-      setCategories(categoriesData.filter((category) => category.is_active))
-      setPage(1)
+      setProducts(productsData.results)
+      setTotal(productsData.count)
+      setCategories(categoriesData.results.filter((category) => category.is_active))
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'No se pudieron cargar los productos.'))
     } finally {
       setIsLoading(false)
     }
-  }, [search])
+  }, [categoryFilter, isActiveFilter, isLowStockFilter, page, search])
 
   useEffect(() => {
     queueMicrotask(fetchProducts)
   }, [fetchProducts])
 
-  const paginatedProducts = useMemo(
-    () => products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [page, products],
-  )
+  const emptyMessage = useMemo(() => {
+    if (isLoading) {
+      return 'Cargando productos...'
+    }
+
+    if (search || categoryFilter || isActiveFilter !== '' || isLowStockFilter) {
+      return 'No hay productos que coincidan con los filtros.'
+    }
+
+    return 'No hay productos.'
+  }, [categoryFilter, isActiveFilter, isLoading, isLowStockFilter, search])
 
   function openCreateModal() {
     setEditingProduct(null)
+    setFieldErrors({})
     setIsFormOpen(true)
   }
 
   function openEditModal(product) {
     setEditingProduct(product)
+    setFieldErrors({})
     setIsFormOpen(true)
+  }
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleCategoryFilterChange(value) {
+    setCategoryFilter(value)
+    setPage(1)
+  }
+
+  function handleStateFilterChange(value) {
+    setIsActiveFilter(value)
+    setPage(1)
+  }
+
+  function handleLowStockFilterChange(value) {
+    setIsLowStockFilter(value)
+    setPage(1)
   }
 
   async function handleSubmit(payload) {
     setIsSubmitting(true)
     setError('')
+    setFieldErrors({})
+    setSuccessMessage('')
 
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, payload)
+        setSuccessMessage('Producto actualizado correctamente.')
       } else {
         await createProduct(payload)
+        setSuccessMessage('Producto creado correctamente.')
       }
 
       setEditingProduct(null)
       setIsFormOpen(false)
       await fetchProducts()
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No se pudo guardar el producto.'))
+      if (requestError.response?.status === 400) {
+        setFieldErrors(requestError.response.data ?? {})
+      } else {
+        setError(getApiErrorMessage(requestError, 'No se pudo guardar el producto.'))
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  async function handleDelete() {
+  async function handleActivate(product) {
     setIsSubmitting(true)
     setError('')
+    setSuccessMessage('')
 
     try {
-      await deleteProduct(productToDelete.id)
-      setProductToDelete(null)
+      await activateProduct(product.id)
+      setSuccessMessage('Producto activado correctamente.')
       await fetchProducts()
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No se pudo eliminar el producto.'))
+      setError(getApiErrorMessage(requestError, 'No se pudo activar el producto.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleDeactivate() {
+    setIsSubmitting(true)
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      await deactivateProduct(productToDeactivate.id)
+      setProductToDeactivate(null)
+      setSuccessMessage('Producto desactivado correctamente.')
+      await fetchProducts()
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'No se pudo desactivar el producto.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -173,10 +242,20 @@ function ProductsPage() {
       key: 'stock',
       header: 'Stock',
       render: (product) => (
-        <span className={`badge ${product.stock <= product.minimum_stock ? 'badge-warning' : 'badge-neutral'}`}>
-          {product.stock}
-        </span>
+        <div className="space-y-1">
+          <span className={`badge ${getStockBadgeClass(product)}`}>
+            {getStockLabel(product)}
+          </span>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            Min. {product.minimum_stock}
+          </p>
+        </div>
       ),
+    },
+    {
+      key: 'cost_price',
+      header: 'Costo',
+      render: (product) => formatMoney(product.cost_price),
     },
     {
       key: 'sale_price',
@@ -204,12 +283,29 @@ function ProductsPage() {
       header: 'Acciones',
       render: (product) => (
         <div className="flex gap-2">
-          <button className="icon-btn" onClick={() => openEditModal(product)} type="button">
+          <button aria-label={`Editar ${product.name}`} className="icon-btn" onClick={() => openEditModal(product)} type="button">
             <FiEdit2 aria-hidden="true" />
           </button>
-          <button className="icon-btn" onClick={() => setProductToDelete(product)} type="button">
-            <FiTrash2 aria-hidden="true" />
-          </button>
+          {product.is_active ? (
+            <button
+              aria-label={`Desactivar ${product.name}`}
+              className="icon-btn"
+              onClick={() => setProductToDeactivate(product)}
+              type="button"
+            >
+              <FiPower aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              aria-label={`Activar ${product.name}`}
+              className="icon-btn"
+              disabled={isSubmitting}
+              onClick={() => handleActivate(product)}
+              type="button"
+            >
+              <FiRefreshCw aria-hidden="true" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -220,22 +316,63 @@ function ProductsPage() {
       <InventoryHeader
         actionLabel="Nuevo producto"
         onAction={openCreateModal}
-        onSearchChange={setSearch}
+        onSearchChange={handleSearchChange}
         search={search}
-        subtitle="Administra productos, stock, precios, SKU y codigos de barra."
+        subtitle="Administra productos, stock, precios, SKU y codigos de barras."
         title="Productos"
       />
 
+      <section className="surface grid gap-3 p-4 md:grid-cols-3">
+        <label>
+          <span className="field-label">Categoria</span>
+          <select
+            className="select"
+            onChange={(event) => handleCategoryFilterChange(event.target.value)}
+            value={categoryFilter}
+          >
+            <option value="">Todas</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span className="field-label">Estado</span>
+          <select
+            className="select"
+            onChange={(event) => handleStateFilterChange(event.target.value)}
+            value={isActiveFilter}
+          >
+            <option value="">Todos</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+          </select>
+        </label>
+
+        <label className="flex items-end gap-2 text-sm">
+          <input
+            checked={isLowStockFilter}
+            onChange={(event) => handleLowStockFilterChange(event.target.checked)}
+            type="checkbox"
+          />
+          Mostrar solo stock bajo
+        </label>
+      </section>
+
       {error ? <div className="alert alert-error">{error}</div> : null}
+      {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
       <DataTable
         columns={columns}
-        data={isLoading ? [] : paginatedProducts}
-        emptyMessage={isLoading ? 'Cargando productos...' : 'No hay productos.'}
+        data={isLoading ? [] : products}
+        emptyMessage={emptyMessage}
         onPageChange={setPage}
         page={page}
         pageSize={PAGE_SIZE}
-        total={products.length}
+        total={total}
       />
 
       <FormModal
@@ -245,6 +382,7 @@ function ProductsPage() {
       >
         <ProductForm
           categories={categories}
+          fieldErrors={fieldErrors}
           isSubmitting={isSubmitting}
           onCancel={() => setIsFormOpen(false)}
           onSubmit={handleSubmit}
@@ -253,15 +391,41 @@ function ProductsPage() {
       </FormModal>
 
       <ConfirmDialog
-        description={`Se eliminara el producto "${productToDelete?.name}". Esta accion no se puede deshacer.`}
-        isOpen={Boolean(productToDelete)}
+        confirmLabel="Desactivar"
+        description={`El producto "${productToDeactivate?.name}" dejara de estar disponible para nuevos usos, pero se conservara su historial.`}
+        isOpen={Boolean(productToDeactivate)}
         isSubmitting={isSubmitting}
-        onCancel={() => setProductToDelete(null)}
-        onConfirm={handleDelete}
-        title="Eliminar producto"
+        loadingLabel="Desactivando..."
+        onCancel={() => setProductToDeactivate(null)}
+        onConfirm={handleDeactivate}
+        title="Desactivar producto"
       />
     </div>
   )
+}
+
+function getStockBadgeClass(product) {
+  if (product.stock <= 0) {
+    return 'badge-error'
+  }
+
+  if (product.stock <= product.minimum_stock) {
+    return 'badge-warning'
+  }
+
+  return 'badge-neutral'
+}
+
+function getStockLabel(product) {
+  if (product.stock <= 0) {
+    return 'Sin stock'
+  }
+
+  if (product.stock <= product.minimum_stock) {
+    return `Stock bajo: ${product.stock}`
+  }
+
+  return `Stock: ${product.stock}`
 }
 
 function formatUnit(value) {

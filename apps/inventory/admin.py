@@ -13,6 +13,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    list_select_related = ('category',)
     list_display = (
         'image_preview',
         'name',
@@ -22,7 +23,9 @@ class ProductAdmin(admin.ModelAdmin):
         'stock',
         'unit',
         'location',
+        'cost_price',
         'sale_price',
+        'is_active',
     )
     list_filter = ('is_active', 'category', 'brand', 'unit', 'tax_rate')
     search_fields = ('name', 'sku', 'barcode', 'brand')

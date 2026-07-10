@@ -88,6 +88,7 @@ class Product(models.Model):
         ordering = ('name',)
 
     def save(self, *args, **kwargs):
+        self.name = self.name.strip()
         self.sku = self.sku.strip().upper()
         self.barcode = self.barcode.strip() if self.barcode else None
         super().save(*args, **kwargs)
