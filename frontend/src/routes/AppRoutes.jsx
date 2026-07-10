@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
+import CustomersPage from '../pages/Customers/CustomersPage'
 import DashboardPage from '../pages/Dashboard/DashboardPage'
 import CategoriesPage from '../pages/Inventory/CategoriesPage'
 import ProductsPage from '../pages/Inventory/ProductsPage'
@@ -18,6 +19,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="/customers" element={<CustomersPage />} />
           <Route path="/inventory/products" element={<ProductsPage />} />
           <Route path="/inventory/categories" element={<CategoriesPage />} />
         </Route>
