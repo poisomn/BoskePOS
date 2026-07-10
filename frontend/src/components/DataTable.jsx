@@ -42,7 +42,7 @@ function DataTable({
 
       <div className="flex items-center justify-between border-t px-4 py-3" style={{ borderColor: 'var(--color-border)' }}>
         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          Pagina {page} de {totalPages} · {total} registros
+          Pagina {page} de {totalPages} - {total} registros
         </p>
         <div className="flex gap-2">
           <button

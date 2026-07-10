@@ -3,9 +3,11 @@ function ConfirmDialog({
   description,
   isOpen,
   isSubmitting,
+  loadingLabel = 'Eliminando...',
   onCancel,
   onConfirm,
   title,
+  tone = 'danger',
 }) {
   if (!isOpen) {
     return null
@@ -22,8 +24,13 @@ function ConfirmDialog({
           <button className="btn btn-secondary" disabled={isSubmitting} onClick={onCancel} type="button">
             Cancelar
           </button>
-          <button className="btn btn-danger" disabled={isSubmitting} onClick={onConfirm} type="button">
-            {isSubmitting ? 'Eliminando...' : confirmLabel}
+          <button
+            className={`btn ${tone === 'primary' ? 'btn-primary' : 'btn-danger'}`}
+            disabled={isSubmitting}
+            onClick={onConfirm}
+            type="button"
+          >
+            {isSubmitting ? loadingLabel : confirmLabel}
           </button>
         </div>
       </section>

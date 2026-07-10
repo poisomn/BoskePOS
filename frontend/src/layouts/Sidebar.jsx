@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { FiGrid, FiHome, FiPackage, FiShoppingCart, FiUsers } from 'react-icons/fi'
+import { FiBarChart2, FiGrid, FiHome, FiPackage, FiShoppingCart, FiUsers } from 'react-icons/fi'
 
 const navItems = [
   { icon: FiHome, label: 'Dashboard', to: '/' },
   { icon: FiShoppingCart, label: 'POS', to: '/pos' },
+  { icon: FiBarChart2, label: 'Ventas', to: '/sales' },
   { icon: FiUsers, label: 'Clientes', to: '/customers' },
   { icon: FiPackage, label: 'Productos', to: '/inventory/products' },
   { icon: FiGrid, label: 'Categorias', to: '/inventory/categories' },

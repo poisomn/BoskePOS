@@ -8,6 +8,8 @@ import CategoriesPage from '../pages/Inventory/CategoriesPage'
 import ProductsPage from '../pages/Inventory/ProductsPage'
 import LoginPage from '../pages/Login/LoginPage'
 import POSPage from '../pages/POS/POSPage'
+import SaleDetailPage from '../pages/Sales/SaleDetailPage'
+import SalesHistoryPage from '../pages/Sales/SalesHistoryPage'
 import ProtectedRoute from './ProtectedRoute'
 
 function AppRoutes() {
@@ -21,6 +23,8 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
           <Route path="/pos" element={<POSPage />} />
+          <Route path="/sales" element={<SalesHistoryPage />} />
+          <Route path="/sales/:saleId" element={<SaleDetailPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/inventory/products" element={<ProductsPage />} />
           <Route path="/inventory/categories" element={<CategoriesPage />} />

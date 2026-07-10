@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
+  FiCheckCircle,
   FiMinus,
   FiPlus,
   FiSearch,
@@ -8,8 +10,11 @@ import {
   FiX,
 } from 'react-icons/fi'
 
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { quotePosCart, searchPosProducts } from '../../services/posService'
+import { createSale } from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
+import { formatMoney } from '../../utils/formatters'
 
 const emptyQuote = {
   items: [],
@@ -18,10 +23,13 @@ const emptyQuote = {
 }
 
 function POSPage() {
+  const navigate = useNavigate()
   const searchInputRef = useRef(null)
   const [cartItems, setCartItems] = useState([])
   const [error, setError] = useState('')
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
+  const [isRegisteringSale, setIsRegisteringSale] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [quote, setQuote] = useState(emptyQuote)
   const [search, setSearch] = useState('')
@@ -164,6 +172,27 @@ function POSPage() {
     }
   }
 
+  async function handleConfirmSale() {
+    setIsRegisteringSale(true)
+    setError('')
+
+    try {
+      const sale = await createSale({ items: cartItems })
+      setCartItems([])
+      setQuote(emptyQuote)
+      setIsConfirmOpen(false)
+      navigate(`/sales/${sale.id}`, {
+        replace: true,
+        state: { saleRegistered: true },
+      })
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'No se pudo registrar la venta.'))
+      setIsConfirmOpen(false)
+    } finally {
+      setIsRegisteringSale(false)
+    }
+  }
+
   return (
     <div className="grid h-[calc(100svh-8rem)] min-h-[680px] w-full gap-6 xl:grid-cols-[1fr_420px]">
       <section className="flex min-h-0 flex-col gap-4">
@@ -246,7 +275,7 @@ function POSPage() {
                       <p className="font-semibold">{product.name}</p>
                       <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                         SKU {product.sku}
-                        {product.barcode ? ` · ${product.barcode}` : ''}
+                        {product.barcode ? ` - ${product.barcode}` : ''}
                       </p>
                     </div>
                     <div className="text-right">
@@ -289,7 +318,7 @@ function POSPage() {
                     <div>
                       <p className="font-semibold">{item.name}</p>
                       <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                        SKU {item.sku} · Stock {item.available_stock}
+                        SKU {item.sku} - Stock {item.available_stock}
                       </p>
                     </div>
                     <button
@@ -377,19 +406,32 @@ function POSPage() {
                 {formatMoney(quote.total)}
               </strong>
             </div>
+            <button
+              className="btn btn-primary mt-3 h-12 w-full text-base"
+              disabled={!cartItems.length || isQuoting || isRegisteringSale}
+              onClick={() => setIsConfirmOpen(true)}
+              type="button"
+            >
+              <FiCheckCircle aria-hidden="true" />
+              Cobrar
+            </button>
           </div>
         </div>
       </aside>
+
+      <ConfirmDialog
+        confirmLabel="Confirmar venta"
+        description={`Se registrara una venta por ${formatMoney(quote.total)}. El inventario se descontara automaticamente.`}
+        isOpen={isConfirmOpen}
+        isSubmitting={isRegisteringSale}
+        loadingLabel="Registrando..."
+        onCancel={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmSale}
+        title="Confirmar venta"
+        tone="primary"
+      />
     </div>
   )
-}
-
-function formatMoney(value) {
-  return new Intl.NumberFormat('es-CL', {
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-    style: 'currency',
-  }).format(Number(value))
 }
 
 export default POSPage
