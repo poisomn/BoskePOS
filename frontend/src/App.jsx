@@ -1,13 +1,7 @@
-import { Route, Routes } from 'react-router-dom'
-
-import DesignSystemPreview from './design-system/DesignSystemPreview.jsx'
+import AppRoutes from './routes/AppRoutes'
 
 function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<DesignSystemPreview />} />
-    </Routes>
-  )
+  return <AppRoutes />
 }
 
 export default App
