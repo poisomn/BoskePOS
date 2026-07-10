@@ -1,3 +1,12 @@
+import { NavLink } from 'react-router-dom'
+import { FiGrid, FiHome, FiPackage } from 'react-icons/fi'
+
+const navItems = [
+  { icon: FiHome, label: 'Dashboard', to: '/' },
+  { icon: FiPackage, label: 'Productos', to: '/inventory/products' },
+  { icon: FiGrid, label: 'Categorias', to: '/inventory/categories' },
+]
+
 function Sidebar() {
   return (
     <aside className="sidebar hidden lg:flex">
@@ -8,9 +17,19 @@ function Sidebar() {
           className="h-14 w-auto object-contain"
         />
       </div>
-      <div className="flex flex-1 items-center justify-center p-4 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-        Modulos disponibles en proximos sprints.
-      </div>
+      <nav className="flex flex-1 flex-col gap-1 p-3">
+        {navItems.map(({ icon: Icon, label, to }) => (
+          <NavLink
+            className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
+            end={to === '/'}
+            key={to}
+            to={to}
+          >
+            <Icon aria-hidden="true" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
     </aside>
   )
 }

@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
+import DashboardPage from '../pages/Dashboard/DashboardPage'
+import CategoriesPage from '../pages/Inventory/CategoriesPage'
+import ProductsPage from '../pages/Inventory/ProductsPage'
 import LoginPage from '../pages/Login/LoginPage'
 import ProtectedRoute from './ProtectedRoute'
 
@@ -14,14 +17,9 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route
-            index
-            element={
-              <div className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Base autenticada lista. Los modulos se implementaran en proximos sprints.
-              </div>
-            }
-          />
+          <Route index element={<DashboardPage />} />
+          <Route path="/inventory/products" element={<ProductsPage />} />
+          <Route path="/inventory/categories" element={<CategoriesPage />} />
         </Route>
       </Route>
 
