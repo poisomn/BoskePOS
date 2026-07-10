@@ -15,6 +15,25 @@ class CategorySerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+        extra_kwargs = {
+            'name': {'validators': []},
+        }
+
+    def validate_name(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError('El nombre de la categoria es obligatorio.')
+
+        queryset = Category.objects.filter(name__iexact=value)
+
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError('Ya existe una categoria con este nombre.')
+
+        return value
 
 
 class ProductSerializer(serializers.ModelSerializer):

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.db.models.functions import Lower, Trim
 
 
 class Category(models.Model):
@@ -15,6 +16,16 @@ class Category(models.Model):
         ordering = ('name',)
         verbose_name = 'category'
         verbose_name_plural = 'categories'
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim('name')),
+                name='unique_category_normalized_name',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.strip()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -61,8 +72,10 @@ class Product(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0)],
     )
-    tax_rate = models.IntegerField(
-        default=(19),
+    tax_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('19.00'),
         validators=[MinValueValidator(0)],
     )
     stock = models.PositiveIntegerField(default=0)

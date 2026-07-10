@@ -19,10 +19,11 @@ class InventoryApiTests(APITestCase):
     def test_category_crud(self):
         create_response = self.client.post(
             reverse('inventory:category-list'),
-            {'name': 'Herramientas', 'description': 'Categoria general'},
+            {'name': ' Herramientas ', 'description': 'Categoria general'},
             format='json',
         )
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data['name'], 'Herramientas')
 
         category_id = create_response.data['id']
         detail_url = reverse('inventory:category-detail', args=[category_id])
@@ -36,6 +37,135 @@ class InventoryApiTests(APITestCase):
 
         delete_response = self.client.delete(detail_url)
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_category_list_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse('inventory:category-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_category_list_is_paginated(self):
+        for index in range(9):
+            Category.objects.create(name=f'Categoria {index:02d}')
+
+        response = self.client.get(reverse('inventory:category-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 9)
+        self.assertEqual(len(response.data['results']), 8)
+        self.assertIsNotNone(response.data['next'])
+        self.assertIsNone(response.data['previous'])
+
+    def test_category_search_by_name(self):
+        Category.objects.create(name='Herramientas Manuales')
+        Category.objects.create(name='Pinturas')
+
+        response = self.client.get(
+            reverse('inventory:category-list'),
+            {'search': 'herramientas'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Herramientas Manuales')
+
+    def test_category_filter_by_active_state(self):
+        Category.objects.create(name='Activa', is_active=True)
+        Category.objects.create(name='Inactiva', is_active=False)
+
+        response = self.client.get(
+            reverse('inventory:category-list'),
+            {'is_active': 'false'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['name'], 'Inactiva')
+
+    def test_category_name_is_required_after_trim(self):
+        response = self.client.post(
+            reverse('inventory:category-list'),
+            {'name': '   ', 'description': 'Sin nombre valido'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
+    def test_category_name_must_be_unique_case_insensitive(self):
+        Category.objects.create(name='Pinturas')
+
+        response = self.client.post(
+            reverse('inventory:category-list'),
+            {'name': ' pinturas ', 'description': 'Duplicada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
+    def test_category_can_be_updated_without_false_duplicate(self):
+        category = Category.objects.create(name='Electricidad', description='Inicial')
+
+        response = self.client.patch(
+            reverse('inventory:category-detail', args=[category.id]),
+            {'name': ' Electricidad ', 'description': 'Actualizada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['name'], 'Electricidad')
+        self.assertEqual(response.data['description'], 'Actualizada')
+
+    def test_category_update_rejects_duplicate_name(self):
+        Category.objects.create(name='Pinturas')
+        category = Category.objects.create(name='Electricidad')
+
+        response = self.client.patch(
+            reverse('inventory:category-detail', args=[category.id]),
+            {'name': 'pinturas'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
+    def test_category_activate_and_deactivate(self):
+        category = Category.objects.create(name='Plomeria', is_active=True)
+
+        deactivate_response = self.client.post(
+            reverse('inventory:category-deactivate', args=[category.id]),
+            format='json',
+        )
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(deactivate_response.data['is_active'])
+
+        activate_response = self.client.post(
+            reverse('inventory:category-activate', args=[category.id]),
+            format='json',
+        )
+        self.assertEqual(activate_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(activate_response.data['is_active'])
+
+    def test_category_detail_not_found(self):
+        response = self.client.get(reverse('inventory:category-detail', args=[99999]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_category_with_products_is_not_deleted_physically(self):
+        category = Category.objects.create(name='Ferreteria')
+        Product.objects.create(
+            category=category,
+            name='Martillo',
+            sku='CAT-DEL-001',
+            sale_price=Decimal('3990.00'),
+        )
+
+        response = self.client.delete(reverse('inventory:category-detail', args=[category.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertTrue(Category.objects.filter(id=category.id).exists())
 
     def test_product_crud_and_sku_normalization(self):
         category = Category.objects.create(name='Pinturas')

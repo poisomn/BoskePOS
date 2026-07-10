@@ -6,17 +6,26 @@ const initialState = {
   is_active: true,
 }
 
-function CategoryForm({ category, isSubmitting, onCancel, onSubmit }) {
-  const [formData, setFormData] = useState(() => category ?? initialState)
+function CategoryForm({ category, fieldErrors = {}, isSubmitting, onCancel, onSubmit }) {
+  const [formData, setFormData] = useState(() => mapCategoryToForm(category))
+  const [localErrors, setLocalErrors] = useState({})
 
   function updateField(field, value) {
     setFormData((current) => ({ ...current, [field]: value }))
+    setLocalErrors((current) => ({ ...current, [field]: '' }))
   }
 
   function handleSubmit(event) {
     event.preventDefault()
+    const name = formData.name.trim()
+
+    if (!name) {
+      setLocalErrors({ name: 'El nombre de la categoria es obligatorio.' })
+      return
+    }
+
     onSubmit({
-      name: formData.name.trim(),
+      name,
       description: formData.description.trim(),
       is_active: formData.is_active,
     })
@@ -27,19 +36,30 @@ function CategoryForm({ category, isSubmitting, onCancel, onSubmit }) {
       <label>
         <span className="field-label">Nombre</span>
         <input
+          aria-describedby={getFieldError('name', localErrors, fieldErrors) ? 'category-name-error' : undefined}
+          aria-invalid={Boolean(getFieldError('name', localErrors, fieldErrors))}
           className="input"
+          id="category-name"
           onChange={(event) => updateField('name', event.target.value)}
           required
           value={formData.name}
         />
+        <FieldError id="category-name-error" message={getFieldError('name', localErrors, fieldErrors)} />
       </label>
 
       <label>
         <span className="field-label">Descripcion</span>
         <textarea
+          aria-describedby={getFieldError('description', localErrors, fieldErrors) ? 'category-description-error' : undefined}
+          aria-invalid={Boolean(getFieldError('description', localErrors, fieldErrors))}
           className="textarea"
+          id="category-description"
           onChange={(event) => updateField('description', event.target.value)}
           value={formData.description}
+        />
+        <FieldError
+          id="category-description-error"
+          message={getFieldError('description', localErrors, fieldErrors)}
         />
       </label>
 
@@ -62,6 +82,34 @@ function CategoryForm({ category, isSubmitting, onCancel, onSubmit }) {
       </div>
     </form>
   )
+}
+
+function FieldError({ id, message }) {
+  if (!message) {
+    return null
+  }
+
+  return (
+    <p className="mt-1 text-sm" id={id} style={{ color: 'var(--color-error)' }}>
+      {message}
+    </p>
+  )
+}
+
+function getFieldError(field, localErrors, fieldErrors) {
+  return localErrors[field] || fieldErrors[field]?.[0] || fieldErrors[field] || ''
+}
+
+function mapCategoryToForm(category) {
+  if (!category) {
+    return initialState
+  }
+
+  return {
+    description: category.description ?? '',
+    is_active: Boolean(category.is_active),
+    name: category.name ?? '',
+  }
 }
 
 export default CategoryForm
