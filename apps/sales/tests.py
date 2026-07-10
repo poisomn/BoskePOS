@@ -5,7 +5,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.customers.models import Customer
 from apps.inventory.models import Product
+from apps.sales.models import Sale, SaleItem
 
 
 class PosApiTests(APITestCase):
@@ -118,3 +120,76 @@ class PosApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('items', response.data)
+
+    def test_register_sale_creates_detail_and_discounts_inventory(self):
+        customer = Customer.objects.create(name='Cliente POS', rut='12345678-5')
+
+        response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'customer_id': customer.id,
+                'items': [
+                    {'product_id': self.hammer.id, 'quantity': 2},
+                    {'product_id': self.screwdriver.id, 'quantity': 1},
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['total'], '9970.00')
+        self.assertEqual(len(response.data['items']), 2)
+        self.assertEqual(Sale.objects.count(), 1)
+        self.assertEqual(SaleItem.objects.count(), 2)
+
+        self.hammer.refresh_from_db()
+        self.screwdriver.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 8)
+        self.assertEqual(self.screwdriver.stock, 4)
+
+    def test_register_sale_without_customer(self):
+        response = self.client.post(
+            reverse('sales:sale-list'),
+            {'items': [{'product_id': self.hammer.id, 'quantity': 1}]},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data['customer'])
+        self.assertEqual(response.data['total'], '3990.00')
+
+    def test_failed_sale_rolls_back_everything(self):
+        response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'items': [
+                    {'product_id': self.hammer.id, 'quantity': 1},
+                    {'product_id': self.screwdriver.id, 'quantity': 99},
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Sale.objects.count(), 0)
+        self.assertEqual(SaleItem.objects.count(), 0)
+
+        self.hammer.refresh_from_db()
+        self.screwdriver.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 10)
+        self.assertEqual(self.screwdriver.stock, 5)
+
+    def test_register_sale_rejects_duplicate_products(self):
+        response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'items': [
+                    {'product_id': self.hammer.id, 'quantity': 1},
+                    {'product_id': self.hammer.id, 'quantity': 1},
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Sale.objects.count(), 0)

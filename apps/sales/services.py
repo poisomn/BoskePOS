@@ -1,8 +1,11 @@
 from decimal import Decimal
 
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product
+
+from .models import Sale, SaleItem
 
 
 def build_pos_cart_quote(items):
@@ -59,6 +62,72 @@ def build_pos_cart_quote(items):
         'subtotal': format_money(subtotal),
         'total': format_money(subtotal),
     }
+
+
+@transaction.atomic
+def register_sale(*, user, customer=None, items):
+    if not items:
+        raise ValidationError({'items': 'Sale must include at least one item.'})
+
+    product_ids = [item['product_id'] for item in items]
+    duplicate_ids = {product_id for product_id in product_ids if product_ids.count(product_id) > 1}
+    if duplicate_ids:
+        raise ValidationError({'items': 'A product can only appear once in the sale.'})
+
+    products = {
+        product.id: product
+        for product in Product.objects.select_for_update().filter(
+            id__in=product_ids,
+            is_active=True,
+        )
+    }
+
+    missing_ids = [product_id for product_id in product_ids if product_id not in products]
+    if missing_ids:
+        raise ValidationError({'items': 'One or more products are unavailable.'})
+
+    subtotal = Decimal('0')
+    sale_items_data = []
+
+    for item in items:
+        product = products[item['product_id']]
+        quantity = item['quantity']
+
+        if quantity > product.stock:
+            raise ValidationError(
+                {'items': f'Insufficient stock for product {product.sku}.'}
+            )
+
+        line_total = product.sale_price * quantity
+        subtotal += line_total
+        sale_items_data.append(
+            {
+                'product': product,
+                'product_name': product.name,
+                'product_sku': product.sku,
+                'quantity': quantity,
+                'unit_price': product.sale_price,
+                'line_total': line_total,
+            }
+        )
+
+    sale = Sale.objects.create(
+        customer=customer,
+        user=user,
+        subtotal=subtotal,
+        total=subtotal,
+    )
+
+    SaleItem.objects.bulk_create(
+        SaleItem(sale=sale, **item_data) for item_data in sale_items_data
+    )
+
+    for item_data in sale_items_data:
+        product = item_data['product']
+        product.stock -= item_data['quantity']
+        product.save(update_fields=('stock', 'updated_at'))
+
+    return Sale.objects.prefetch_related('items').select_related('customer', 'user').get(pk=sale.pk)
 
 
 def format_money(value):
