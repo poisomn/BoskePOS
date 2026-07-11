@@ -530,6 +530,155 @@ class InventoryApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_product_by_barcode_returns_active_product(self):
+        category = Category.objects.create(name='Codigos')
+        product = Product.objects.create(
+            category=category,
+            name='Producto con codigo exacto',
+            sku='BAR-LOOKUP-001',
+            barcode='000123456789',
+            sale_price=Decimal('2500.00'),
+            stock=6,
+            minimum_stock=2,
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['000123456789'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], product.id)
+        self.assertEqual(response.data['barcode'], '000123456789')
+        self.assertEqual(response.data['sale_price'], '2500.00')
+        self.assertEqual(response.data['category_detail']['name'], 'Codigos')
+
+    def test_product_by_barcode_preserves_alphanumeric_codes(self):
+        Product.objects.create(
+            name='Producto alfanumerico',
+            sku='BAR-ALPHA-001',
+            barcode='ABC-001-XYZ',
+            sale_price=Decimal('1000.00'),
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['ABC-001-XYZ'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['barcode'], 'ABC-001-XYZ')
+
+    def test_product_by_barcode_normalizes_outer_spaces(self):
+        Product.objects.create(
+            name='Producto espacios',
+            sku='BAR-SPACE-001',
+            barcode='780000000100',
+            sale_price=Decimal('1000.00'),
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=[' 780000000100 '])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['barcode'], '780000000100')
+
+    def test_product_by_barcode_does_not_match_partial_codes(self):
+        Product.objects.create(
+            name='Producto parcial',
+            sku='BAR-PART-001',
+            barcode='780000000200',
+            sale_price=Decimal('1000.00'),
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['780000'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_product_by_barcode_returns_not_found_for_unknown_code(self):
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['999999999999'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_product_by_barcode_rejects_empty_code_after_trim(self):
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['   '])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('barcode', response.data)
+
+    def test_product_by_barcode_rejects_too_long_code(self):
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['1' * 65])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('barcode', response.data)
+
+    def test_product_by_barcode_returns_conflict_for_inactive_product(self):
+        product = Product.objects.create(
+            name='Producto inactivo',
+            sku='BAR-INACTIVE-001',
+            barcode='780000000300',
+            sale_price=Decimal('1000.00'),
+            is_active=False,
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['780000000300'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data['product']['id'], product.id)
+        self.assertFalse(response.data['product']['is_active'])
+
+    def test_product_by_barcode_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['780000000400'])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_product_by_barcode_does_not_modify_stock(self):
+        product = Product.objects.create(
+            name='Producto sin movimiento',
+            sku='BAR-STOCK-001',
+            barcode='780000000500',
+            sale_price=Decimal('1000.00'),
+            stock=11,
+        )
+
+        response = self.client.get(
+            reverse('inventory:product-by-barcode', args=['780000000500'])
+        )
+        product.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(product.stock, 11)
+
+    def test_product_by_barcode_uses_single_product_query(self):
+        category = Category.objects.create(name='Consulta codigo')
+        Product.objects.create(
+            category=category,
+            name='Producto consulta codigo',
+            sku='BAR-SQL-001',
+            barcode='780000000600',
+            sale_price=Decimal('1000.00'),
+        )
+
+        with self.assertNumQueries(1):
+            response = self.client.get(
+                reverse('inventory:product-by-barcode', args=['780000000600'])
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_product_tax_rate_defaults_to_19_percent(self):
         product = Product.objects.create(
             name='Producto con IVA por defecto',

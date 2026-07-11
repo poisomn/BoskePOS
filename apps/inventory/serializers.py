@@ -115,3 +115,23 @@ class ProductSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('No se puede asignar una categoria inactiva.')
 
         return value
+
+
+class ProductBarcodeLookupSerializer(serializers.ModelSerializer):
+    category_detail = CategorySerializer(source='category', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = (
+            'id',
+            'category',
+            'category_detail',
+            'name',
+            'sku',
+            'barcode',
+            'sale_price',
+            'stock',
+            'minimum_stock',
+            'is_active',
+        )
+        read_only_fields = fields

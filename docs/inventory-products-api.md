@@ -97,6 +97,45 @@ Reglas:
 
 `GET /api/inventory/products/{id}/`
 
+## Buscar por codigo de barras
+
+`GET /api/inventory/products/by-barcode/{barcode}/`
+
+El codigo se trata siempre como texto. El backend aplica `trim`, conserva ceros
+iniciales y realiza una coincidencia exacta contra `barcode`. No se hacen
+busquedas parciales ni conversiones numericas.
+
+Respuesta `200 OK` para producto activo:
+
+```json
+{
+  "id": 1,
+  "category": 1,
+  "category_detail": {
+    "id": 1,
+    "name": "Abrasivos",
+    "description": "Discos de corte y lijas.",
+    "is_active": true,
+    "created_at": "2026-07-10T12:00:00Z",
+    "updated_at": "2026-07-10T12:00:00Z"
+  },
+  "name": "Disco de Corte Metal 4.5",
+  "sku": "AB001",
+  "barcode": "000123456789",
+  "sale_price": "1990.00",
+  "stock": 24,
+  "minimum_stock": 6,
+  "is_active": true
+}
+```
+
+Errores:
+
+- `400 Bad Request`: codigo vacio o mayor a 64 caracteres.
+- `404 Not Found`: no existe producto asociado al codigo exacto.
+- `409 Conflict`: existe producto asociado, pero esta inactivo. La respuesta
+  incluye `detail` y `product` para identificarlo.
+
 ## Actualizar producto
 
 `PUT /api/inventory/products/{id}/`

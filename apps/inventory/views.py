@@ -5,7 +5,11 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import Category, Product
-from .serializers import CategorySerializer, ProductSerializer
+from .serializers import (
+    CategorySerializer,
+    ProductBarcodeLookupSerializer,
+    ProductSerializer,
+)
 
 
 class StandardPageNumberPagination(PageNumberPagination):
@@ -117,6 +121,50 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(barcode=barcode.strip())
 
         return queryset
+
+    @action(
+        detail=False,
+        methods=('get',),
+        url_path=r'by-barcode/(?P<barcode>[^/]+)',
+    )
+    def by_barcode(self, request, barcode=None):
+        normalized_barcode = barcode.strip() if barcode else ''
+
+        if not normalized_barcode:
+            return Response(
+                {'barcode': ['El codigo de barras es obligatorio.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(normalized_barcode) > Product._meta.get_field('barcode').max_length:
+            return Response(
+                {'barcode': ['El codigo de barras excede el largo maximo permitido.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        product = (
+            Product.objects.select_related('category')
+            .filter(barcode=normalized_barcode)
+            .first()
+        )
+
+        if product is None:
+            return Response(
+                {'detail': 'No existe un producto asociado a este codigo de barras.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not product.is_active:
+            return Response(
+                {
+                    'detail': 'El producto asociado a este codigo de barras esta inactivo.',
+                    'product': ProductBarcodeLookupSerializer(product).data,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = ProductBarcodeLookupSerializer(product)
+        return Response(serializer.data)
 
     @action(detail=True, methods=('post',))
     def activate(self, request, pk=None):

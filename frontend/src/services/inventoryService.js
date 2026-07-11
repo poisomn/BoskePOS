@@ -136,6 +136,14 @@ export async function getProduct(id) {
   return data
 }
 
+export async function getProductByBarcode(barcode) {
+  const normalizedBarcode = barcode.trim()
+  const { data } = await http.get(
+    `/inventory/products/by-barcode/${encodeURIComponent(normalizedBarcode)}/`,
+  )
+  return data
+}
+
 export async function createProduct(payload) {
   const { data } = await http.post('/inventory/products/', payload)
   return data

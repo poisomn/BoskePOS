@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiEdit2, FiPower, FiRefreshCw } from 'react-icons/fi'
 
+import BarcodeInput from '../../components/BarcodeInput'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
@@ -8,6 +9,7 @@ import {
   activateProduct,
   createProduct,
   deactivateProduct,
+  getProductByBarcode,
   listCategoriesPage,
   listProductsPage,
   updateProduct,
@@ -20,6 +22,9 @@ import ProductForm from './ProductForm'
 const PAGE_SIZE = 8
 
 function ProductsPage() {
+  const [barcodeError, setBarcodeError] = useState('')
+  const [barcodeResult, setBarcodeResult] = useState(null)
+  const [isBarcodeLoading, setIsBarcodeLoading] = useState(false)
   const [categories, setCategories] = useState([])
   const [categoryFilter, setCategoryFilter] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
@@ -109,6 +114,32 @@ function ProductsPage() {
   function handleLowStockFilterChange(value) {
     setIsLowStockFilter(value)
     setPage(1)
+  }
+
+  async function handleBarcodeSubmit(barcode) {
+    setIsBarcodeLoading(true)
+    setBarcodeError('')
+    setBarcodeResult(null)
+
+    try {
+      const product = await getProductByBarcode(barcode)
+      setBarcodeResult(product)
+    } catch (requestError) {
+      const status = requestError.response?.status
+
+      if (status === 400) {
+        setBarcodeError(getApiErrorMessage(requestError, 'Ingresa un codigo de barras valido.'))
+      } else if (status === 404) {
+        setBarcodeError('No existe un producto asociado a este codigo de barras.')
+      } else if (status === 409) {
+        setBarcodeError(requestError.response?.data?.detail ?? 'El producto existe, pero esta inactivo.')
+        setBarcodeResult(requestError.response?.data?.product ?? null)
+      } else {
+        setBarcodeError(getApiErrorMessage(requestError, 'No se pudo buscar el codigo de barras.'))
+      }
+    } finally {
+      setIsBarcodeLoading(false)
+    }
   }
 
   async function handleSubmit(payload) {
@@ -321,6 +352,53 @@ function ProductsPage() {
         subtitle="Administra productos, stock, precios, SKU y codigos de barras."
         title="Productos"
       />
+
+      <section className="surface p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
+          <BarcodeInput
+            autoFocus
+            isLoading={isBarcodeLoading}
+            onSubmit={handleBarcodeSubmit}
+          />
+
+          <div className="rounded-md border p-4" style={{ borderColor: 'var(--color-border)' }}>
+            <p className="text-sm font-semibold">Resultado del codigo</p>
+            {isBarcodeLoading ? (
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Buscando producto...
+              </p>
+            ) : null}
+            {barcodeError ? <div className="alert alert-warning mt-3">{barcodeError}</div> : null}
+            {barcodeResult ? (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <p className="font-semibold">{barcodeResult.name}</p>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    {barcodeResult.sku} · {barcodeResult.barcode}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge badge-info">
+                    {barcodeResult.category_detail?.name ?? 'Sin categoria'}
+                  </span>
+                  <span className={`badge ${getStockBadgeClass(barcodeResult)}`}>
+                    {getStockLabel(barcodeResult)}
+                  </span>
+                  <span className={`badge ${barcodeResult.is_active ? 'badge-success' : 'badge-neutral'}`}>
+                    {barcodeResult.is_active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                <p className="text-lg font-semibold">{formatMoney(barcodeResult.sale_price)}</p>
+              </div>
+            ) : null}
+            {!isBarcodeLoading && !barcodeError && !barcodeResult ? (
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Escanea un producto para ver su informacion.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
 
       <section className="surface grid gap-3 p-4 md:grid-cols-3">
         <label>
