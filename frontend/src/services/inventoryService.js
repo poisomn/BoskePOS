@@ -167,3 +167,39 @@ export async function deactivateProduct(id) {
   const { data } = await http.post(`/inventory/products/${id}/deactivate/`)
   return data
 }
+
+export async function adjustProductStock(id, payload) {
+  const { data } = await http.post(`/inventory/products/${id}/adjust-stock/`, payload)
+  return data
+}
+
+export async function listStockMovementsPage({
+  dateFrom = '',
+  dateTo = '',
+  movementType = '',
+  page = 1,
+  pageSize = 8,
+  product = '',
+  search = '',
+  user = '',
+} = {}) {
+  const params = {
+    page,
+    page_size: pageSize,
+  }
+
+  if (product) params.product = product
+  if (movementType) params.movement_type = movementType
+  if (user) params.user = user
+  if (dateFrom) params.date_from = dateFrom
+  if (dateTo) params.date_to = dateTo
+  if (search) params.search = search
+
+  const { data } = await http.get('/inventory/movements/', { params })
+  return normalizePaginatedResponse(data)
+}
+
+export async function getStockMovement(id) {
+  const { data } = await http.get(`/inventory/movements/${id}/`)
+  return data
+}

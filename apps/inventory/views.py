@@ -1,15 +1,19 @@
-from django.db.models import F, ProtectedError
+from django.db.models import F, ProtectedError, Q
+from django.utils.dateparse import parse_date
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from .models import Category, Product
+from .models import Category, Product, StockMovement
 from .serializers import (
     CategorySerializer,
     ProductBarcodeLookupSerializer,
     ProductSerializer,
+    StockAdjustmentSerializer,
+    StockMovementSerializer,
 )
+from .services import StockMovementError
 
 
 class StandardPageNumberPagination(PageNumberPagination):
@@ -181,3 +185,67 @@ class ProductViewSet(viewsets.ModelViewSet):
         product.save(update_fields=('is_active', 'updated_at'))
         serializer = self.get_serializer(product)
         return Response(serializer.data)
+
+    @action(detail=True, methods=('post',), url_path='adjust-stock')
+    def adjust_stock(self, request, pk=None):
+        product = self.get_object()
+        serializer = StockAdjustmentSerializer(
+            data=request.data,
+            context={'product': product, 'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        try:
+            movement = serializer.save()
+        except StockMovementError as error:
+            field = error.field or 'detail'
+            payload = {field: [error.message]} if field != 'detail' else {'detail': error.message}
+            return Response(payload, status=status.HTTP_409_CONFLICT)
+
+        output_serializer = StockMovementSerializer(movement)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StockMovement.objects.select_related('product', 'product__category', 'user')
+    serializer_class = StockMovementSerializer
+    pagination_class = StandardPageNumberPagination
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ('created_at', 'movement_type', 'quantity')
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        product = self.request.query_params.get('product')
+        movement_type = self.request.query_params.get('movement_type')
+        user = self.request.query_params.get('user')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        search = self.request.query_params.get('search', '').strip()
+
+        if product:
+            queryset = queryset.filter(product_id=product)
+
+        if movement_type:
+            queryset = queryset.filter(movement_type=movement_type)
+
+        if user:
+            queryset = queryset.filter(user_id=user)
+
+        if date_from:
+            parsed_date_from = parse_date(date_from)
+            if parsed_date_from:
+                queryset = queryset.filter(created_at__date__gte=parsed_date_from)
+
+        if date_to:
+            parsed_date_to = parse_date(date_to)
+            if parsed_date_to:
+                queryset = queryset.filter(created_at__date__lte=parsed_date_to)
+
+        if search:
+            queryset = queryset.filter(
+                Q(product__name__icontains=search)
+                | Q(product__sku__icontains=search.upper())
+                | Q(product__barcode__icontains=search)
+                | Q(reason__icontains=search)
+            )
+
+        return queryset

@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.db.models.functions import Lower, Trim
@@ -95,3 +96,39 @@ class Product(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.sku})'
+
+
+class StockMovement(models.Model):
+    class MovementType(models.TextChoices):
+        ENTRY = 'entry', 'Entrada'
+        EXIT = 'exit', 'Salida'
+        POSITIVE_ADJUSTMENT = 'positive_adjustment', 'Ajuste positivo'
+        NEGATIVE_ADJUSTMENT = 'negative_adjustment', 'Ajuste negativo'
+
+    product = models.ForeignKey(
+        Product,
+        related_name='stock_movements',
+        on_delete=models.PROTECT,
+    )
+    movement_type = models.CharField(max_length=30, choices=MovementType.choices)
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    reason = models.TextField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='stock_movements',
+        on_delete=models.PROTECT,
+    )
+    stock_before = models.PositiveIntegerField()
+    stock_after = models.PositiveIntegerField()
+    reference = models.CharField(max_length=120, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = (
+            models.Index(fields=('product', 'created_at')),
+            models.Index(fields=('movement_type', 'created_at')),
+        )
+
+    def __str__(self):
+        return f'{self.get_movement_type_display()} {self.product.sku} x {self.quantity}'

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FiEdit2, FiPower, FiRefreshCw } from 'react-icons/fi'
+import { FiEdit2, FiPackage, FiPower, FiRefreshCw } from 'react-icons/fi'
 
 import BarcodeInput from '../../components/BarcodeInput'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -7,21 +7,38 @@ import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
 import {
   activateProduct,
+  adjustProductStock,
   createProduct,
   deactivateProduct,
   getProductByBarcode,
   listCategoriesPage,
   listProductsPage,
+  listStockMovementsPage,
   updateProduct,
 } from '../../services/inventoryService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
-import { formatMoney } from '../../utils/formatters'
+import { formatDateTime, formatMoney } from '../../utils/formatters'
 import InventoryHeader from './InventoryHeader'
 import ProductForm from './ProductForm'
 
 const PAGE_SIZE = 8
+const MOVEMENT_PAGE_SIZE = 8
+const MOVEMENT_TYPES = [
+  { label: 'Entrada', value: 'entry' },
+  { label: 'Salida', value: 'exit' },
+  { label: 'Ajuste positivo', value: 'positive_adjustment' },
+  { label: 'Ajuste negativo', value: 'negative_adjustment' },
+]
+const DECREASE_MOVEMENTS = new Set(['exit', 'negative_adjustment'])
 
 function ProductsPage() {
+  const [adjustmentForm, setAdjustmentForm] = useState({
+    movement_type: 'positive_adjustment',
+    quantity: '1',
+    reason: '',
+  })
+  const [adjustmentErrors, setAdjustmentErrors] = useState({})
+  const [confirmAdjustment, setConfirmAdjustment] = useState(false)
   const [barcodeError, setBarcodeError] = useState('')
   const [barcodeResult, setBarcodeResult] = useState(null)
   const [isBarcodeLoading, setIsBarcodeLoading] = useState(false)
@@ -34,8 +51,16 @@ function ProductsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLowStockFilter, setIsLowStockFilter] = useState(false)
+  const [isMovementsLoading, setIsMovementsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [movementError, setMovementError] = useState('')
+  const [movementPage, setMovementPage] = useState(1)
+  const [movementSearch, setMovementSearch] = useState('')
+  const [movementTypeFilter, setMovementTypeFilter] = useState('')
+  const [movements, setMovements] = useState([])
+  const [movementTotal, setMovementTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [productToAdjust, setProductToAdjust] = useState(null)
   const [productToDeactivate, setProductToDeactivate] = useState(null)
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
@@ -68,9 +93,33 @@ function ProductsPage() {
     }
   }, [categoryFilter, isActiveFilter, isLowStockFilter, page, search])
 
+  const fetchMovements = useCallback(async () => {
+    setIsMovementsLoading(true)
+    setMovementError('')
+
+    try {
+      const data = await listStockMovementsPage({
+        movementType: movementTypeFilter,
+        page: movementPage,
+        pageSize: MOVEMENT_PAGE_SIZE,
+        search: movementSearch,
+      })
+      setMovements(data.results)
+      setMovementTotal(data.count)
+    } catch (requestError) {
+      setMovementError(getApiErrorMessage(requestError, 'No se pudo cargar el historial de stock.'))
+    } finally {
+      setIsMovementsLoading(false)
+    }
+  }, [movementPage, movementSearch, movementTypeFilter])
+
   useEffect(() => {
     queueMicrotask(fetchProducts)
   }, [fetchProducts])
+
+  useEffect(() => {
+    queueMicrotask(fetchMovements)
+  }, [fetchMovements])
 
   const emptyMessage = useMemo(() => {
     if (isLoading) {
@@ -96,6 +145,16 @@ function ProductsPage() {
     setIsFormOpen(true)
   }
 
+  function openAdjustmentModal(product) {
+    setProductToAdjust(product)
+    setAdjustmentErrors({})
+    setAdjustmentForm({
+      movement_type: 'positive_adjustment',
+      quantity: '1',
+      reason: '',
+    })
+  }
+
   function handleSearchChange(value) {
     setSearch(value)
     setPage(1)
@@ -114,6 +173,16 @@ function ProductsPage() {
   function handleLowStockFilterChange(value) {
     setIsLowStockFilter(value)
     setPage(1)
+  }
+
+  function handleMovementSearchChange(value) {
+    setMovementSearch(value)
+    setMovementPage(1)
+  }
+
+  function handleMovementTypeFilterChange(value) {
+    setMovementTypeFilter(value)
+    setMovementPage(1)
   }
 
   async function handleBarcodeSubmit(barcode) {
@@ -180,6 +249,7 @@ function ProductsPage() {
       await activateProduct(product.id)
       setSuccessMessage('Producto activado correctamente.')
       await fetchProducts()
+      await fetchMovements()
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'No se pudo activar el producto.'))
     } finally {
@@ -197,8 +267,65 @@ function ProductsPage() {
       setProductToDeactivate(null)
       setSuccessMessage('Producto desactivado correctamente.')
       await fetchProducts()
+      await fetchMovements()
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'No se pudo desactivar el producto.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  function validateAdjustment() {
+    const quantity = Number(adjustmentForm.quantity)
+    const errors = {}
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      errors.quantity = 'La cantidad debe ser mayor que cero.'
+    }
+
+    if (!adjustmentForm.reason.trim()) {
+      errors.reason = 'El motivo es obligatorio.'
+    }
+
+    setAdjustmentErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  async function submitAdjustment() {
+    if (!productToAdjust || !validateAdjustment()) {
+      return
+    }
+
+    const quantity = Number(adjustmentForm.quantity)
+    const decreasesStock = DECREASE_MOVEMENTS.has(adjustmentForm.movement_type)
+
+    if (decreasesStock && !confirmAdjustment) {
+      setConfirmAdjustment(true)
+      return
+    }
+
+    setIsSubmitting(true)
+    setError('')
+    setSuccessMessage('')
+    setAdjustmentErrors({})
+
+    try {
+      const movement = await adjustProductStock(productToAdjust.id, {
+        movement_type: adjustmentForm.movement_type,
+        quantity,
+        reason: adjustmentForm.reason.trim(),
+      })
+      setSuccessMessage(`Stock actualizado. Nuevo saldo: ${movement.stock_after}.`)
+      setProductToAdjust(null)
+      setConfirmAdjustment(false)
+      await fetchProducts()
+      await fetchMovements()
+    } catch (requestError) {
+      if (requestError.response?.status === 400 || requestError.response?.status === 409) {
+        setAdjustmentErrors(requestError.response.data ?? {})
+      } else {
+        setError(getApiErrorMessage(requestError, 'No se pudo ajustar el stock.'))
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -316,6 +443,14 @@ function ProductsPage() {
         <div className="flex gap-2">
           <button aria-label={`Editar ${product.name}`} className="icon-btn" onClick={() => openEditModal(product)} type="button">
             <FiEdit2 aria-hidden="true" />
+          </button>
+          <button
+            aria-label={`Ajustar stock de ${product.name}`}
+            className="icon-btn"
+            onClick={() => openAdjustmentModal(product)}
+            type="button"
+          >
+            <FiPackage aria-hidden="true" />
           </button>
           {product.is_active ? (
             <button
@@ -478,9 +613,169 @@ function ProductsPage() {
         onConfirm={handleDeactivate}
         title="Desactivar producto"
       />
+
+      <FormModal
+        isOpen={Boolean(productToAdjust)}
+        onClose={() => setProductToAdjust(null)}
+        title="Ajustar stock"
+      >
+        <div className="space-y-4">
+          <div className="alert alert-info">
+            <span>
+              Producto: <strong>{productToAdjust?.name}</strong>. Stock actual:{' '}
+              <strong>{productToAdjust?.stock ?? 0}</strong>.
+            </span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="field-label">Tipo de movimiento</span>
+              <select
+                className="select"
+                onChange={(event) => {
+                  setAdjustmentForm((current) => ({ ...current, movement_type: event.target.value }))
+                  setConfirmAdjustment(false)
+                }}
+                value={adjustmentForm.movement_type}
+              >
+                {MOVEMENT_TYPES.map((movementType) => (
+                  <option key={movementType.value} value={movementType.value}>
+                    {movementType.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span className="field-label">Cantidad</span>
+              <input
+                className="input"
+                min="1"
+                onChange={(event) => {
+                  setAdjustmentForm((current) => ({ ...current, quantity: event.target.value }))
+                  setConfirmAdjustment(false)
+                }}
+                type="number"
+                value={adjustmentForm.quantity}
+              />
+              <FieldError message={getAdjustmentError('quantity', adjustmentErrors)} />
+            </label>
+          </div>
+
+          <label>
+            <span className="field-label">Motivo</span>
+            <textarea
+              className="textarea"
+              onChange={(event) => {
+                setAdjustmentForm((current) => ({ ...current, reason: event.target.value }))
+                setConfirmAdjustment(false)
+              }}
+              value={adjustmentForm.reason}
+            />
+            <FieldError message={getAdjustmentError('reason', adjustmentErrors)} />
+          </label>
+
+          <div className="alert alert-warning">
+            Saldo estimado: {getProjectedStock(productToAdjust, adjustmentForm)}. El backend confirmara el saldo final.
+          </div>
+          <FieldError message={getAdjustmentError('detail', adjustmentErrors)} />
+
+          <div className="flex justify-end gap-2">
+            <button className="btn btn-secondary" disabled={isSubmitting} onClick={() => setProductToAdjust(null)} type="button">
+              Cancelar
+            </button>
+            <button className="btn btn-primary" disabled={isSubmitting} onClick={submitAdjustment} type="button">
+              {isSubmitting ? 'Registrando...' : confirmAdjustment ? 'Confirmar disminucion' : 'Registrar ajuste'}
+            </button>
+          </div>
+        </div>
+      </FormModal>
+
+      <section className="surface space-y-4 p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="section-title">Historial de movimientos</h2>
+            <p className="section-note">Cada ajuste manual queda registrado con usuario, fecha y saldo.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label>
+              <span className="field-label">Buscar</span>
+              <input
+                className="input"
+                onChange={(event) => handleMovementSearchChange(event.target.value)}
+                placeholder="Producto, SKU o motivo"
+                value={movementSearch}
+              />
+            </label>
+            <label>
+              <span className="field-label">Tipo</span>
+              <select
+                className="select"
+                onChange={(event) => handleMovementTypeFilterChange(event.target.value)}
+                value={movementTypeFilter}
+              >
+                <option value="">Todos</option>
+                {MOVEMENT_TYPES.map((movementType) => (
+                  <option key={movementType.value} value={movementType.value}>
+                    {movementType.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {movementError ? <div className="alert alert-error">{movementError}</div> : null}
+        <DataTable
+          columns={movementColumns}
+          data={isMovementsLoading ? [] : movements}
+          emptyMessage={isMovementsLoading ? 'Cargando movimientos...' : 'No hay movimientos.'}
+          onPageChange={setMovementPage}
+          page={movementPage}
+          pageSize={MOVEMENT_PAGE_SIZE}
+          total={movementTotal}
+        />
+      </section>
     </div>
   )
 }
+
+const movementColumns = [
+  {
+    key: 'created_at',
+    header: 'Fecha',
+    render: (movement) => formatDateTime(movement.created_at),
+  },
+  {
+    key: 'product',
+    header: 'Producto',
+    render: (movement) => (
+      <div>
+        <p className="font-semibold">{movement.product?.name}</p>
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          {movement.product?.sku}
+        </p>
+      </div>
+    ),
+  },
+  {
+    key: 'movement_type',
+    header: 'Tipo',
+    render: (movement) => formatMovementType(movement.movement_type),
+  },
+  { key: 'quantity', header: 'Cantidad' },
+  { key: 'reason', header: 'Motivo' },
+  {
+    key: 'user',
+    header: 'Usuario',
+    render: (movement) => movement.user?.email ?? '-',
+  },
+  {
+    key: 'stock',
+    header: 'Saldo',
+    render: (movement) => `${movement.stock_before} -> ${movement.stock_after}`,
+  },
+]
 
 function getStockBadgeClass(product) {
   if (product.stock <= 0) {
@@ -504,6 +799,41 @@ function getStockLabel(product) {
   }
 
   return `Stock: ${product.stock}`
+}
+
+function getProjectedStock(product, form) {
+  const currentStock = Number(product?.stock ?? 0)
+  const quantity = Number(form.quantity)
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return currentStock
+  }
+
+  if (DECREASE_MOVEMENTS.has(form.movement_type)) {
+    return currentStock - quantity
+  }
+
+  return currentStock + quantity
+}
+
+function getAdjustmentError(field, errors) {
+  return errors[field]?.[0] || errors[field] || ''
+}
+
+function FieldError({ message }) {
+  if (!message) {
+    return null
+  }
+
+  return (
+    <p className="mt-1 text-sm" style={{ color: 'var(--color-error)' }}>
+      {message}
+    </p>
+  )
+}
+
+function formatMovementType(value) {
+  return MOVEMENT_TYPES.find((movementType) => movementType.value === value)?.label ?? value
 }
 
 function formatUnit(value) {

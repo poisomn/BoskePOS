@@ -5,7 +5,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Category, Product
+from .models import Category, Product, StockMovement
+from .services import StockMovementError, apply_stock_movement
 
 
 class InventoryApiTests(APITestCase):
@@ -192,13 +193,14 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(create_response.data['location'], '')
         self.assertIsNone(create_response.data['image'])
         self.assertEqual(create_response.data['tax_rate'], '19.00')
+        self.assertEqual(create_response.data['stock'], 0)
 
         product_id = create_response.data['id']
         detail_url = reverse('inventory:product-detail', args=[product_id])
 
         update_response = self.client.patch(detail_url, {'stock': 8}, format='json')
         self.assertEqual(update_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(update_response.data['stock'], 8)
+        self.assertEqual(update_response.data['stock'], 0)
 
         delete_response = self.client.delete(detail_url)
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
@@ -433,7 +435,7 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(barcode_response.data['count'], 1)
         self.assertEqual(barcode_response.data['results'][0]['barcode'], '000000000002')
 
-    def test_product_rejects_negative_prices_and_stock(self):
+    def test_product_rejects_negative_prices_and_minimum_stock(self):
         payload = {
             'name': 'Producto invalido',
             'sku': 'NEG-001',
@@ -452,8 +454,26 @@ class InventoryApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('cost_price', response.data)
         self.assertIn('sale_price', response.data)
-        self.assertIn('stock', response.data)
         self.assertIn('minimum_stock', response.data)
+
+    def test_product_serializer_does_not_modify_stock_directly(self):
+        product = Product.objects.create(
+            name='Producto sin stock directo',
+            sku='NO-STOCK-DIRECT-001',
+            sale_price=Decimal('1000.00'),
+            stock=5,
+        )
+
+        response = self.client.patch(
+            reverse('inventory:product-detail', args=[product.id]),
+            {'stock': 99},
+            format='json',
+        )
+        product.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(product.stock, 5)
+        self.assertEqual(response.data['stock'], 5)
 
     def test_product_rejects_inactive_category(self):
         category = Category.objects.create(name='Categoria inactiva', is_active=False)
@@ -702,3 +722,260 @@ class InventoryApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('unit', response.data)
+
+    def test_apply_stock_movement_entry_updates_stock_and_creates_audit(self):
+        product = Product.objects.create(
+            name='Producto entrada',
+            sku='MOV-ENTRY-001',
+            sale_price=Decimal('1000.00'),
+            stock=3,
+        )
+
+        result = apply_stock_movement(
+            product=product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=4,
+            reason='Recepcion manual',
+            user=self.user,
+        )
+        product.refresh_from_db()
+
+        self.assertEqual(product.stock, 7)
+        self.assertEqual(result.movement.stock_before, 3)
+        self.assertEqual(result.movement.stock_after, 7)
+        self.assertEqual(result.movement.quantity, 4)
+
+    def test_apply_stock_movement_exit_rejects_negative_stock(self):
+        product = Product.objects.create(
+            name='Producto salida invalida',
+            sku='MOV-EXIT-001',
+            sale_price=Decimal('1000.00'),
+            stock=2,
+        )
+
+        with self.assertRaises(StockMovementError):
+            apply_stock_movement(
+                product=product,
+                movement_type=StockMovement.MovementType.EXIT,
+                quantity=3,
+                reason='Salida invalida',
+                user=self.user,
+            )
+
+        product.refresh_from_db()
+        self.assertEqual(product.stock, 2)
+        self.assertEqual(StockMovement.objects.count(), 0)
+
+    def test_apply_stock_movement_rejects_invalid_quantity_and_reason(self):
+        product = Product.objects.create(
+            name='Producto validacion movimiento',
+            sku='MOV-VALID-001',
+            sale_price=Decimal('1000.00'),
+        )
+
+        with self.assertRaises(StockMovementError):
+            apply_stock_movement(
+                product=product,
+                movement_type=StockMovement.MovementType.ENTRY,
+                quantity=0,
+                reason='Cantidad cero',
+                user=self.user,
+            )
+
+        with self.assertRaises(StockMovementError):
+            apply_stock_movement(
+                product=product,
+                movement_type=StockMovement.MovementType.ENTRY,
+                quantity=1,
+                reason='   ',
+                user=self.user,
+            )
+
+    def test_stock_adjustment_endpoint_creates_movement(self):
+        product = Product.objects.create(
+            name='Producto ajuste',
+            sku='ADJ-001',
+            sale_price=Decimal('1000.00'),
+            stock=5,
+        )
+
+        response = self.client.post(
+            reverse('inventory:product-adjust-stock', args=[product.id]),
+            {
+                'movement_type': StockMovement.MovementType.POSITIVE_ADJUSTMENT,
+                'quantity': 3,
+                'reason': 'Correccion de conteo',
+            },
+            format='json',
+        )
+        product.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(product.stock, 8)
+        self.assertEqual(response.data['stock_before'], 5)
+        self.assertEqual(response.data['stock_after'], 8)
+        self.assertEqual(response.data['user']['email'], self.user.email)
+
+    def test_stock_adjustment_endpoint_rejects_insufficient_stock(self):
+        product = Product.objects.create(
+            name='Producto ajuste insuficiente',
+            sku='ADJ-002',
+            sale_price=Decimal('1000.00'),
+            stock=1,
+        )
+
+        response = self.client.post(
+            reverse('inventory:product-adjust-stock', args=[product.id]),
+            {
+                'movement_type': StockMovement.MovementType.NEGATIVE_ADJUSTMENT,
+                'quantity': 2,
+                'reason': 'Merma',
+            },
+            format='json',
+        )
+        product.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(product.stock, 1)
+        self.assertEqual(StockMovement.objects.count(), 0)
+
+    def test_stock_adjustment_endpoint_rejects_inactive_product(self):
+        product = Product.objects.create(
+            name='Producto inactivo ajuste',
+            sku='ADJ-INACTIVE-001',
+            sale_price=Decimal('1000.00'),
+            is_active=False,
+        )
+
+        response = self.client.post(
+            reverse('inventory:product-adjust-stock', args=[product.id]),
+            {
+                'movement_type': StockMovement.MovementType.ENTRY,
+                'quantity': 1,
+                'reason': 'Entrada',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('product', response.data)
+
+    def test_stock_adjustment_requires_authentication(self):
+        product = Product.objects.create(
+            name='Producto auth ajuste',
+            sku='ADJ-AUTH-001',
+            sale_price=Decimal('1000.00'),
+        )
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            reverse('inventory:product-adjust-stock', args=[product.id]),
+            {
+                'movement_type': StockMovement.MovementType.ENTRY,
+                'quantity': 1,
+                'reason': 'Entrada',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_stock_movement_history_is_paginated_and_filterable(self):
+        product = Product.objects.create(
+            name='Producto historial',
+            sku='HIS-001',
+            sale_price=Decimal('1000.00'),
+        )
+        other_product = Product.objects.create(
+            name='Producto historial dos',
+            sku='HIS-002',
+            sale_price=Decimal('1000.00'),
+        )
+        apply_stock_movement(
+            product=product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=5,
+            reason='Entrada historial',
+            user=self.user,
+        )
+        apply_stock_movement(
+            product=other_product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=2,
+            reason='Otra entrada',
+            user=self.user,
+        )
+
+        response = self.client.get(
+            reverse('inventory:movement-list'),
+            {'product': product.id, 'movement_type': StockMovement.MovementType.ENTRY},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['product']['sku'], 'HIS-001')
+
+    def test_stock_movement_history_searches_product_and_reason(self):
+        product = Product.objects.create(
+            name='Producto busqueda historial',
+            sku='HIS-SEARCH-001',
+            sale_price=Decimal('1000.00'),
+        )
+        apply_stock_movement(
+            product=product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=5,
+            reason='Inventario ciclico',
+            user=self.user,
+        )
+
+        sku_response = self.client.get(reverse('inventory:movement-list'), {'search': 'his-search'})
+        reason_response = self.client.get(
+            reverse('inventory:movement-list'),
+            {'search': 'ciclico'},
+        )
+
+        self.assertEqual(sku_response.data['count'], 1)
+        self.assertEqual(reason_response.data['count'], 1)
+
+    def test_stock_movement_detail_is_read_only(self):
+        product = Product.objects.create(
+            name='Producto movimiento readonly',
+            sku='HIS-READ-001',
+            sale_price=Decimal('1000.00'),
+        )
+        movement = apply_stock_movement(
+            product=product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=5,
+            reason='Entrada readonly',
+            user=self.user,
+        ).movement
+        detail_url = reverse('inventory:movement-detail', args=[movement.id])
+
+        put_response = self.client.put(detail_url, {'reason': 'Cambio'}, format='json')
+        patch_response = self.client.patch(detail_url, {'reason': 'Cambio'}, format='json')
+        delete_response = self.client.delete(detail_url)
+
+        self.assertEqual(put_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(patch_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(delete_response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_stock_movement_history_uses_related_queries(self):
+        product = Product.objects.create(
+            name='Producto consulta movimiento',
+            sku='HIS-SQL-001',
+            sale_price=Decimal('1000.00'),
+        )
+        apply_stock_movement(
+            product=product,
+            movement_type=StockMovement.MovementType.ENTRY,
+            quantity=5,
+            reason='Entrada consulta',
+            user=self.user,
+        )
+
+        with self.assertNumQueries(2):
+            response = self.client.get(reverse('inventory:movement-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

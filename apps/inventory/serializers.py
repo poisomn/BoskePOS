@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from .models import Category, Product
+from .models import Category, Product, StockMovement
+from .services import apply_stock_movement
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -62,7 +63,13 @@ class ProductSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         )
-        read_only_fields = ('id', 'category_detail', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id',
+            'category_detail',
+            'stock',
+            'created_at',
+            'updated_at',
+        )
         extra_kwargs = {
             'sku': {'validators': []},
             'barcode': {'validators': []},
@@ -135,3 +142,76 @@ class ProductBarcodeLookupSerializer(serializers.ModelSerializer):
             'is_active',
         )
         read_only_fields = fields
+
+
+class StockMovementProductSerializer(serializers.ModelSerializer):
+    category_detail = CategorySerializer(source='category', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = (
+            'id',
+            'name',
+            'sku',
+            'barcode',
+            'stock',
+            'minimum_stock',
+            'is_active',
+            'category_detail',
+        )
+        read_only_fields = fields
+
+
+class StockMovementUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    product = StockMovementProductSerializer(read_only=True)
+    user = StockMovementUserSerializer(read_only=True)
+
+    class Meta:
+        model = StockMovement
+        fields = (
+            'id',
+            'product',
+            'movement_type',
+            'quantity',
+            'reason',
+            'user',
+            'stock_before',
+            'stock_after',
+            'reference',
+            'created_at',
+        )
+        read_only_fields = fields
+
+
+class StockAdjustmentSerializer(serializers.Serializer):
+    movement_type = serializers.ChoiceField(choices=StockMovement.MovementType.choices)
+    quantity = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(allow_blank=False, trim_whitespace=True)
+
+    def validate_reason(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('El motivo es obligatorio.')
+        return value.strip()
+
+    def validate(self, attrs):
+        product = self.context['product']
+        if not product.is_active:
+            raise serializers.ValidationError(
+                {'product': 'No se puede ajustar stock de un producto inactivo.'}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        result = apply_stock_movement(
+            product=self.context['product'],
+            movement_type=validated_data['movement_type'],
+            quantity=validated_data['quantity'],
+            reason=validated_data['reason'],
+            user=self.context['request'].user,
+        )
+        return result.movement

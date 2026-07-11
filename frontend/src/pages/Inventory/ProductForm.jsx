@@ -64,7 +64,6 @@ function ProductForm({ categories, fieldErrors = {}, isSubmitting, onCancel, onS
       cost_price: formData.cost_price || '0.00',
       sale_price: formData.sale_price,
       tax_rate: formData.tax_rate || '19.00',
-      stock: Number(formData.stock),
       minimum_stock: Number(formData.minimum_stock),
       is_active: formData.is_active,
     })
@@ -220,21 +219,15 @@ function ProductForm({ categories, fieldErrors = {}, isSubmitting, onCancel, onS
           <FieldError id="product-tax-error" message={getFieldError('tax_rate', localErrors, fieldErrors)} />
         </label>
 
-        <label>
-          <span className="field-label">Stock</span>
-          <input
-            aria-describedby={getFieldError('stock', localErrors, fieldErrors) ? 'product-stock-error' : undefined}
-            aria-invalid={Boolean(getFieldError('stock', localErrors, fieldErrors))}
-            className="input"
-            id="product-stock"
-            min="0"
-            onChange={(event) => updateField('stock', event.target.value)}
-            required
-            type="number"
-            value={formData.stock}
-          />
-          <FieldError id="product-stock-error" message={getFieldError('stock', localErrors, fieldErrors)} />
-        </label>
+        <div>
+          <span className="field-label">Stock actual</span>
+          <div className="input flex items-center" style={{ background: 'var(--color-steel-50)' }}>
+            {formData.stock}
+          </div>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            Las existencias se modifican desde ajustes de stock.
+          </p>
+        </div>
 
         <label>
           <span className="field-label">Stock minimo</span>
