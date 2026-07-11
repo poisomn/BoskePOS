@@ -3,7 +3,20 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.utils.rut import RutError, normalize_rut
+
 from .models import Customer
+
+
+class RutUtilityTests(APITestCase):
+    def test_normalizes_common_chilean_rut_formats(self):
+        self.assertEqual(normalize_rut('12.345.678-5'), '12345678-5')
+        self.assertEqual(normalize_rut(' 1 000 005 k '), '1000005-K')
+        self.assertIsNone(normalize_rut(''))
+
+    def test_rejects_invalid_rut_verifier(self):
+        with self.assertRaises(RutError):
+            normalize_rut('12.345.678-9')
 
 
 class CustomersApiTests(APITestCase):
@@ -53,16 +66,42 @@ class CustomersApiTests(APITestCase):
             {'search': 'maria'},
         )
         self.assertEqual(name_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(name_response.data), 1)
-        self.assertEqual(name_response.data[0]['name'], 'Maria Gonzalez')
+        self.assertEqual(name_response.data['count'], 1)
+        self.assertEqual(name_response.data['results'][0]['name'], 'Maria Gonzalez')
 
         rut_response = self.client.get(
             reverse('customers:customer-list'),
-            {'search': '22222222'},
+            {'search': '22.222.222-2'},
         )
         self.assertEqual(rut_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(rut_response.data), 1)
-        self.assertEqual(rut_response.data[0]['name'], 'Carlos Rojas')
+        self.assertEqual(rut_response.data['count'], 1)
+        self.assertEqual(rut_response.data['results'][0]['name'], 'Carlos Rojas')
+
+    def test_filter_by_active_state_and_toggle_state(self):
+        active = Customer.objects.create(name='Cliente Activo', rut='33333333-3')
+        Customer.objects.create(name='Cliente Inactivo', rut='44444444-4', is_active=False)
+
+        list_response = self.client.get(
+            reverse('customers:customer-list'),
+            {'is_active': 'false'},
+        )
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data['count'], 1)
+        self.assertFalse(list_response.data['results'][0]['is_active'])
+
+        deactivate_response = self.client.post(
+            reverse('customers:customer-deactivate', args=[active.id]),
+        )
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+        active.refresh_from_db()
+        self.assertFalse(active.is_active)
+
+        activate_response = self.client.post(
+            reverse('customers:customer-activate', args=[active.id]),
+        )
+        self.assertEqual(activate_response.status_code, status.HTTP_200_OK)
+        active.refresh_from_db()
+        self.assertTrue(active.is_active)
 
     def test_rut_must_be_valid_when_provided(self):
         response = self.client.post(
@@ -92,3 +131,25 @@ class CustomersApiTests(APITestCase):
         )
         self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('rut', duplicate_response.data)
+
+    def test_name_and_email_validation(self):
+        name_response = self.client.post(
+            reverse('customers:customer-list'),
+            {'name': '   '},
+            format='json',
+        )
+        self.assertEqual(name_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('name', name_response.data)
+
+        email_response = self.client.post(
+            reverse('customers:customer-list'),
+            {'name': 'Cliente Email', 'email': 'correo-invalido'},
+            format='json',
+        )
+        self.assertEqual(email_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', email_response.data)
+
+    def test_anonymous_user_cannot_access_customers(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse('customers:customer-list'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

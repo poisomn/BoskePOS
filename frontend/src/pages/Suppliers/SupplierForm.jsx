@@ -10,9 +10,9 @@ const initialState = {
   is_active: true,
 }
 
-function CustomerForm({ customer, fieldErrors = {}, isSubmitting, onCancel, onSubmit }) {
+function SupplierForm({ fieldErrors = {}, isSubmitting, onCancel, onSubmit, supplier }) {
   const [formData, setFormData] = useState(() =>
-    customer ? mapCustomerToForm(customer) : initialState,
+    supplier ? mapSupplierToForm(supplier) : initialState,
   )
 
   function updateField(field, value) {
@@ -36,7 +36,7 @@ function CustomerForm({ customer, fieldErrors = {}, isSubmitting, onCancel, onSu
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="sm:col-span-2">
-          <span className="field-label">Nombre</span>
+          <span className="field-label">Razon social</span>
           <input
             aria-invalid={Boolean(fieldErrors.name)}
             className={`input ${fieldErrors.name ? 'input-error' : ''}`}
@@ -53,12 +53,12 @@ function CustomerForm({ customer, fieldErrors = {}, isSubmitting, onCancel, onSu
             aria-invalid={Boolean(fieldErrors.rut)}
             className={`input ${fieldErrors.rut ? 'input-error' : ''}`}
             onChange={(event) => updateField('rut', event.target.value)}
-            placeholder="12.345.678-5"
+            placeholder="76.543.210-3"
             value={formData.rut}
           />
           <FieldError error={fieldErrors.rut} />
           <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Opcional. Se validara contra el backend.
+            Opcional. Se normalizara y validara en el backend.
           </p>
         </label>
 
@@ -114,7 +114,7 @@ function CustomerForm({ customer, fieldErrors = {}, isSubmitting, onCancel, onSu
           onChange={(event) => updateField('is_active', event.target.checked)}
           type="checkbox"
         />
-        Cliente activo
+        Proveedor activo
       </label>
 
       <div className="flex justify-end gap-2">
@@ -138,16 +138,16 @@ function FieldError({ error }) {
   return <p className="mt-1 text-xs text-red-700">{message}</p>
 }
 
-function mapCustomerToForm(customer) {
+function mapSupplierToForm(supplier) {
   return {
-    name: customer.name ?? '',
-    rut: customer.rut ?? '',
-    email: customer.email ?? '',
-    phone: customer.phone ?? '',
-    address: customer.address ?? '',
-    city: customer.city ?? '',
-    is_active: Boolean(customer.is_active),
+    name: supplier.name ?? '',
+    rut: supplier.rut ?? '',
+    email: supplier.email ?? '',
+    phone: supplier.phone ?? '',
+    address: supplier.address ?? '',
+    city: supplier.city ?? '',
+    is_active: Boolean(supplier.is_active),
   }
 }
 
-export default CustomerForm
+export default SupplierForm

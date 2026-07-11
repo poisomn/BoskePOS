@@ -2,12 +2,12 @@ from rest_framework import serializers
 
 from apps.utils.rut import RutError, normalize_rut
 
-from .models import Customer
+from .models import Supplier
 
 
-class CustomerSerializer(serializers.ModelSerializer):
+class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Customer
+        model = Supplier
         fields = (
             'id',
             'name',
@@ -28,7 +28,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     def validate_name(self, value):
         value = value.strip()
         if not value:
-            raise serializers.ValidationError('El nombre del cliente es obligatorio.')
+            raise serializers.ValidationError('La razon social del proveedor es obligatoria.')
         return value
 
     def validate_rut(self, value):
@@ -40,11 +40,11 @@ class CustomerSerializer(serializers.ModelSerializer):
         if normalized_rut is None:
             return None
 
-        queryset = Customer.objects.filter(rut=normalized_rut)
+        queryset = Supplier.objects.filter(rut=normalized_rut)
         if self.instance:
             queryset = queryset.exclude(pk=self.instance.pk)
 
         if queryset.exists():
-            raise serializers.ValidationError('Ya existe un cliente con este RUT.')
+            raise serializers.ValidationError('Ya existe un proveedor con este RUT.')
 
         return normalized_rut

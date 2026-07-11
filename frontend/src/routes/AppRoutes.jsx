@@ -10,6 +10,7 @@ import LoginPage from '../pages/Login/LoginPage'
 import POSPage from '../pages/POS/POSPage'
 import SaleDetailPage from '../pages/Sales/SaleDetailPage'
 import SalesHistoryPage from '../pages/Sales/SalesHistoryPage'
+import SuppliersPage from '../pages/Suppliers/SuppliersPage'
 import ProtectedRoute from './ProtectedRoute'
 
 function AppRoutes() {
@@ -26,6 +27,7 @@ function AppRoutes() {
           <Route path="/sales" element={<SalesHistoryPage />} />
           <Route path="/sales/:saleId" element={<SaleDetailPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/inventory/products" element={<ProductsPage />} />
           <Route path="/inventory/categories" element={<CategoriesPage />} />
         </Route>

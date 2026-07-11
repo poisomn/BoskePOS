@@ -3,7 +3,7 @@ from django.db import models
 from apps.utils.rut import normalize_rut
 
 
-class Customer(models.Model):
+class Supplier(models.Model):
     name = models.CharField(max_length=180)
     rut = models.CharField(max_length=12, unique=True, null=True, blank=True)
     email = models.EmailField(blank=True)

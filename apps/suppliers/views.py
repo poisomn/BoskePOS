@@ -6,20 +6,20 @@ from rest_framework.response import Response
 
 from apps.utils.rut import RutError, normalize_rut
 
-from .models import Customer
-from .serializers import CustomerSerializer
+from .models import Supplier
+from .serializers import SupplierSerializer
 
 
-class CustomerPagination(PageNumberPagination):
+class SupplierPagination(PageNumberPagination):
     page_size = 8
     page_size_query_param = 'page_size'
     max_page_size = 100
 
 
-class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all()
-    serializer_class = CustomerSerializer
-    pagination_class = CustomerPagination
+class SupplierViewSet(viewsets.ModelViewSet):
+    queryset = Supplier.objects.all()
+    serializer_class = SupplierSerializer
+    pagination_class = SupplierPagination
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('name', 'rut', 'created_at', 'updated_at')
 
@@ -57,14 +57,14 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=('post',))
     def activate(self, request, pk=None):
-        customer = self.get_object()
-        customer.is_active = True
-        customer.save(update_fields=('is_active', 'updated_at'))
-        return Response(self.get_serializer(customer).data)
+        supplier = self.get_object()
+        supplier.is_active = True
+        supplier.save(update_fields=('is_active', 'updated_at'))
+        return Response(self.get_serializer(supplier).data)
 
     @action(detail=True, methods=('post',))
     def deactivate(self, request, pk=None):
-        customer = self.get_object()
-        customer.is_active = False
-        customer.save(update_fields=('is_active', 'updated_at'))
-        return Response(self.get_serializer(customer).data)
+        supplier = self.get_object()
+        supplier.is_active = False
+        supplier.save(update_fields=('is_active', 'updated_at'))
+        return Response(self.get_serializer(supplier).data)

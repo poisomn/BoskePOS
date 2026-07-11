@@ -182,6 +182,11 @@ select {
     box-shadow: 0 0 0 3px rgb(242 122 0 / 0.18);
   }
 
+  .input-error,
+  .textarea-error {
+    border-color: var(--color-error);
+  }
+
   .card {
     @apply border bg-white p-4;
     border-color: var(--color-border);
