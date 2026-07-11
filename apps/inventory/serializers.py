@@ -136,6 +136,7 @@ class ProductBarcodeLookupSerializer(serializers.ModelSerializer):
             'name',
             'sku',
             'barcode',
+            'cost_price',
             'sale_price',
             'stock',
             'minimum_stock',

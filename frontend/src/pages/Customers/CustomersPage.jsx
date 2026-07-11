@@ -213,32 +213,38 @@ function CustomersPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <label className="relative min-w-72">
+          <button className="btn btn-primary" onClick={openCreateModal} type="button">
+            Nuevo cliente
+          </button>
+        </div>
+      </section>
+
+      <section className="surface p-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-end">
+          <label>
+            <span className="field-label">Buscar</span>
+            <div className="relative">
               <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-steel-500)' }} />
               <input
                 className="input pl-10"
                 onChange={(event) => handleSearchChange(event.target.value)}
-                placeholder="Buscar por nombre, RUT, email o telefono"
+                placeholder="Nombre, RUT, email o telefono"
                 value={search}
               />
-            </label>
-            <label className="min-w-44">
-              <span className="field-label">Estado</span>
-              <select
-                className="select"
-                onChange={(event) => handleStateFilterChange(event.target.value)}
-                value={isActiveFilter}
-              >
-                <option value="">Todos</option>
-                <option value="true">Activos</option>
-                <option value="false">Inactivos</option>
-              </select>
-            </label>
-            <button className="btn btn-primary" onClick={openCreateModal} type="button">
-              Nuevo cliente
-            </button>
-          </div>
+            </div>
+          </label>
+          <label>
+            <span className="field-label">Estado</span>
+            <select
+              className="select"
+              onChange={(event) => handleStateFilterChange(event.target.value)}
+              value={isActiveFilter}
+            >
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </label>
         </div>
       </section>
 

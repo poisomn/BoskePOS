@@ -36,6 +36,17 @@ export async function listSuppliersPage({ isActive = '', page = 1, pageSize = 8,
   return normalizePaginatedResponse(data)
 }
 
+export async function listSuppliers(search = '') {
+  const { data } = await http.get('/suppliers/suppliers/', {
+    params: {
+      is_active: 'true',
+      page_size: 100,
+      ...(search ? { search } : {}),
+    },
+  })
+  return normalizePaginatedResponse(data).results
+}
+
 export async function createSupplier(payload) {
   const { data } = await http.post('/suppliers/suppliers/', payload)
   return data
