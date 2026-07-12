@@ -3,7 +3,9 @@ from django.db import models
 
 class Sale(models.Model):
     class Status(models.TextChoices):
-        COMPLETED = 'completed', 'Completed'
+        PENDING = 'pending', 'Pendiente'
+        COMPLETED = 'completed', 'Completada'
+        CANCELLED = 'cancelled', 'Anulada'
 
     customer = models.ForeignKey(
         'customers.Customer',
@@ -23,7 +25,11 @@ class Sale(models.Model):
         default=Status.COMPLETED,
     )
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+    discount_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -44,6 +50,8 @@ class SaleItem(models.Model):
     product_sku = models.CharField(max_length=64)
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    discount_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2)
 
     class Meta:

@@ -10,8 +10,11 @@ import {
   FiX,
 } from 'react-icons/fi'
 
+import BarcodeInput from '../../components/BarcodeInput'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { getProductByBarcode } from '../../services/inventoryService'
 import { quotePosCart, searchPosProducts } from '../../services/posService'
+import { listCustomers } from '../../services/customersService'
 import { createSale } from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatMoney } from '../../utils/formatters'
@@ -25,8 +28,13 @@ const emptyQuote = {
 function POSPage() {
   const navigate = useNavigate()
   const searchInputRef = useRef(null)
+  const [barcodeError, setBarcodeError] = useState('')
+  const [barcodeProduct, setBarcodeProduct] = useState(null)
   const [cartItems, setCartItems] = useState([])
+  const [customerId, setCustomerId] = useState('')
+  const [customers, setCustomers] = useState([])
   const [error, setError] = useState('')
+  const [isBarcodeLoading, setIsBarcodeLoading] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
   const [isRegisteringSale, setIsRegisteringSale] = useState(false)
@@ -38,6 +46,17 @@ function POSPage() {
 
   useEffect(() => {
     searchInputRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    queueMicrotask(async () => {
+      try {
+        const data = await listCustomers()
+        setCustomers(data.filter((customer) => customer.is_active !== false))
+      } catch {
+        setCustomers([])
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -120,6 +139,28 @@ function POSPage() {
     searchInputRef.current?.focus()
   }
 
+  async function handleBarcodeSubmit(barcode) {
+    setIsBarcodeLoading(true)
+    setBarcodeError('')
+    setBarcodeProduct(null)
+
+    try {
+      const product = await getProductByBarcode(barcode)
+      setBarcodeProduct(product)
+      addProduct(product)
+    } catch (requestError) {
+      if (requestError.response?.status === 404) {
+        setBarcodeError('No existe un producto activo con ese codigo.')
+      } else if (requestError.response?.status === 409) {
+        setBarcodeError('El producto existe, pero esta inactivo.')
+      } else {
+        setBarcodeError(getApiErrorMessage(requestError, 'No se pudo procesar el codigo.'))
+      }
+    } finally {
+      setIsBarcodeLoading(false)
+    }
+  }
+
   function updateQuantity(productId, quantity) {
     const nextQuantity = Number(quantity)
 
@@ -177,8 +218,12 @@ function POSPage() {
     setError('')
 
     try {
-      const sale = await createSale({ items: cartItems })
+      const sale = await createSale({
+        customer_id: customerId ? Number(customerId) : null,
+        items: cartItems,
+      })
       setCartItems([])
+      setCustomerId('')
       setQuote(emptyQuote)
       setIsConfirmOpen(false)
       navigate(`/sales/${sale.id}`, {
@@ -236,6 +281,39 @@ function POSPage() {
                 <FiX aria-hidden="true" />
               </button>
             ) : null}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div>
+              <BarcodeInput
+                disabled={isBarcodeLoading}
+                isLoading={isBarcodeLoading}
+                label="Codigo de barras"
+                onSubmit={handleBarcodeSubmit}
+                placeholder="Escanea y presiona Enter"
+              />
+              {barcodeError ? <div className="alert alert-error mt-3">{barcodeError}</div> : null}
+              {barcodeProduct ? (
+                <div className="alert alert-success mt-3">
+                  Producto agregado: {barcodeProduct.name}
+                </div>
+              ) : null}
+            </div>
+            <label>
+              <span className="field-label">Cliente</span>
+              <select
+                className="select"
+                onChange={(event) => setCustomerId(event.target.value)}
+                value={customerId}
+              >
+                <option value="">Consumidor final</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 

@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.customers.models import Customer
-from apps.inventory.models import Product
+from apps.inventory.models import Product, StockMovement
 from apps.sales.models import Sale, SaleItem
 
 
@@ -137,15 +137,24 @@ class PosApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['status'], Sale.Status.COMPLETED)
         self.assertEqual(response.data['total'], '9970.00')
         self.assertEqual(len(response.data['items']), 2)
         self.assertEqual(Sale.objects.count(), 1)
         self.assertEqual(SaleItem.objects.count(), 2)
+        sale_id = response.data['id']
 
         self.hammer.refresh_from_db()
         self.screwdriver.refresh_from_db()
         self.assertEqual(self.hammer.stock, 8)
         self.assertEqual(self.screwdriver.stock, 4)
+        self.assertEqual(
+            StockMovement.objects.filter(
+                movement_type=StockMovement.MovementType.EXIT,
+                reference=f'sale:{sale_id}',
+            ).count(),
+            2,
+        )
 
     def test_register_sale_without_customer(self):
         response = self.client.post(
@@ -173,6 +182,7 @@ class PosApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Sale.objects.count(), 0)
         self.assertEqual(SaleItem.objects.count(), 0)
+        self.assertEqual(StockMovement.objects.count(), 0)
 
         self.hammer.refresh_from_db()
         self.screwdriver.refresh_from_db()
@@ -193,3 +203,65 @@ class PosApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Sale.objects.count(), 0)
+
+    def test_cancel_completed_sale_restores_stock_with_auditable_movements(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {'items': [{'product_id': self.hammer.id, 'quantity': 2}]},
+            format='json',
+        )
+        sale_id = create_response.data['id']
+
+        cancel_response = self.client.post(reverse('sales:sale-cancel', args=[sale_id]))
+
+        self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(cancel_response.data['status'], Sale.Status.CANCELLED)
+        self.hammer.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 10)
+        self.assertEqual(
+            StockMovement.objects.filter(
+                movement_type=StockMovement.MovementType.ENTRY,
+                reference=f'sale-cancel:{sale_id}',
+            ).count(),
+            1,
+        )
+
+        second_cancel_response = self.client.post(reverse('sales:sale-cancel', args=[sale_id]))
+        self.assertEqual(second_cancel_response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_completed_sale_cannot_be_completed_twice(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {'items': [{'product_id': self.hammer.id, 'quantity': 1}]},
+            format='json',
+        )
+
+        response = self.client.post(reverse('sales:sale-complete', args=[create_response.data['id']]))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.hammer.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 9)
+
+    def test_sales_list_is_paginated_and_filterable(self):
+        customer = Customer.objects.create(name='Cliente Filtro', rut='11111111-1')
+        self.client.post(
+            reverse('sales:sale-list'),
+            {'customer_id': customer.id, 'items': [{'product_id': self.hammer.id, 'quantity': 1}]},
+            format='json',
+        )
+
+        response = self.client.get(
+            reverse('sales:sale-list'),
+            {'status': Sale.Status.COMPLETED, 'search': 'Cliente Filtro'},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['customer_name'], 'Cliente Filtro')
+
+    def test_sales_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(reverse('sales:sale-list'))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

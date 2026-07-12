@@ -34,7 +34,7 @@ class SaleCreateSerializer(serializers.Serializer):
         try:
             return Customer.objects.get(pk=value, is_active=True)
         except Customer.DoesNotExist as exc:
-            raise serializers.ValidationError('Customer does not exist or is inactive.') from exc
+            raise serializers.ValidationError('El cliente no existe o esta inactivo.') from exc
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
@@ -47,6 +47,8 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'product_sku',
             'quantity',
             'unit_price',
+            'discount_total',
+            'tax_total',
             'line_total',
         )
         read_only_fields = fields
@@ -56,6 +58,7 @@ class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True, read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = Sale
@@ -66,9 +69,14 @@ class SaleSerializer(serializers.ModelSerializer):
             'user',
             'user_email',
             'status',
+            'status_label',
             'subtotal',
+            'discount_total',
+            'tax_total',
             'total',
             'items',
+            'completed_at',
+            'cancelled_at',
             'created_at',
         )
         read_only_fields = fields

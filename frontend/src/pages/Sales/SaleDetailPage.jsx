@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiCheckCircle, FiFileText } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiFileText, FiXCircle } from 'react-icons/fi'
 
-import { getSale } from '../../services/salesService'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import { cancelSale, getSale } from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
 
@@ -10,8 +11,11 @@ function SaleDetailPage() {
   const { saleId } = useParams()
   const location = useLocation()
   const [error, setError] = useState('')
+  const [isCancelOpen, setIsCancelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [sale, setSale] = useState(null)
+  const [successMessage, setSuccessMessage] = useState('')
   const saleRegistered = Boolean(location.state?.saleRegistered)
 
   const fetchSale = useCallback(async () => {
@@ -31,6 +35,23 @@ function SaleDetailPage() {
   useEffect(() => {
     queueMicrotask(fetchSale)
   }, [fetchSale])
+
+  async function handleCancelSale() {
+    setIsSubmitting(true)
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      const data = await cancelSale(sale.id)
+      setSale(data)
+      setIsCancelOpen(false)
+      setSuccessMessage('Venta anulada correctamente. El stock fue restaurado.')
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'No se pudo anular la venta.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -62,6 +83,8 @@ function SaleDetailPage() {
           Venta registrada correctamente.
         </div>
       ) : null}
+      {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
+      {error ? <div className="alert alert-error">{error}</div> : null}
 
       <section className="surface p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -83,10 +106,18 @@ function SaleDetailPage() {
             </div>
           </div>
 
-          <Link className="btn btn-secondary" to="/sales">
-            <FiArrowLeft aria-hidden="true" />
-            Historial
-          </Link>
+          <div className="flex gap-2">
+            {sale.status === 'completed' ? (
+              <button className="btn btn-danger" onClick={() => setIsCancelOpen(true)} type="button">
+                <FiXCircle aria-hidden="true" />
+                Anular
+              </button>
+            ) : null}
+            <Link className="btn btn-secondary" to="/sales">
+              <FiArrowLeft aria-hidden="true" />
+              Historial
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -129,7 +160,7 @@ function SaleDetailPage() {
             </div>
             <div className="flex justify-between">
               <span style={{ color: 'var(--color-text-muted)' }}>Estado</span>
-              <span className="badge badge-success">{sale.status}</span>
+              <StatusBadge status={sale.status} label={sale.status_label} />
             </div>
             <div className="flex justify-between border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
               <span>Subtotal</span>
@@ -144,8 +175,29 @@ function SaleDetailPage() {
           </div>
         </aside>
       </section>
+
+      <ConfirmDialog
+        confirmLabel="Anular"
+        description="Esta accion restaurara stock mediante movimientos de entrada y dejara la venta como anulada."
+        isOpen={isCancelOpen}
+        isSubmitting={isSubmitting}
+        loadingLabel="Anulando..."
+        onCancel={() => setIsCancelOpen(false)}
+        onConfirm={handleCancelSale}
+        title="Anular venta"
+      />
     </div>
   )
+}
+
+function StatusBadge({ label, status }) {
+  const className = {
+    cancelled: 'badge-error',
+    completed: 'badge-success',
+    pending: 'badge-warning',
+  }[status] ?? 'badge-neutral'
+
+  return <span className={`badge ${className}`}>{label}</span>
 }
 
 export default SaleDetailPage

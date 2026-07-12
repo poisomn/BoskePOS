@@ -12,6 +12,8 @@ class SaleItemInline(admin.TabularInline):
         'product_sku',
         'quantity',
         'unit_price',
+        'discount_total',
+        'tax_total',
         'line_total',
     )
     can_delete = False
@@ -20,7 +22,16 @@ class SaleItemInline(admin.TabularInline):
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
     list_display = ('id', 'customer', 'user', 'status', 'total', 'created_at')
-    list_filter = ('status', 'created_at')
+    list_filter = ('status', 'created_at', 'completed_at', 'cancelled_at')
     search_fields = ('id', 'customer__name', 'customer__rut', 'user__email')
-    readonly_fields = ('subtotal', 'total', 'created_at')
+    readonly_fields = (
+        'subtotal',
+        'discount_total',
+        'tax_total',
+        'total',
+        'completed_at',
+        'cancelled_at',
+        'created_at',
+    )
+    list_select_related = ('customer', 'user')
     inlines = (SaleItemInline,)

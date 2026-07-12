@@ -1,5 +1,7 @@
 from django.db.models import Q
-from rest_framework import generics, mixins, status, viewsets
+from rest_framework import filters, generics, mixins, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -12,7 +14,13 @@ from .serializers import (
     SaleCreateSerializer,
     SaleSerializer,
 )
-from .services import build_pos_cart_quote, register_sale
+from .services import SaleConflict, build_pos_cart_quote, cancel_sale, complete_sale, register_sale
+
+
+class SalePagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class PosProductSearchView(generics.ListAPIView):
@@ -47,7 +55,45 @@ class SaleViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = Sale.objects.select_related('customer', 'user').prefetch_related('items')
+    pagination_class = SalePagination
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ('created_at', 'total', 'status')
+
+    def get_queryset(self):
+        queryset = Sale.objects.select_related('customer', 'user').order_by('-created_at')
+
+        if self.action == 'retrieve':
+            queryset = queryset.prefetch_related('items__product')
+
+        status_value = self.request.query_params.get('status')
+        customer = self.request.query_params.get('customer')
+        user = self.request.query_params.get('user')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+        search = self.request.query_params.get('search', '').strip()
+
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+        if customer:
+            queryset = queryset.filter(customer_id=customer)
+        if user:
+            queryset = queryset.filter(user_id=user)
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        if search:
+            query = (
+                Q(customer__name__icontains=search)
+                | Q(customer__rut__icontains=search.replace('.', '').replace(' ', '').upper())
+                | Q(items__product_name__icontains=search)
+                | Q(items__product_sku__icontains=search.upper())
+            )
+            if search.isdigit():
+                query |= Q(id=int(search))
+            queryset = queryset.filter(query).distinct()
+
+        return queryset
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -66,3 +112,21 @@ class SaleViewSet(
 
         output_serializer = SaleSerializer(sale)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=('post',), url_path='complete')
+    def complete(self, request, pk=None):
+        try:
+            sale = complete_sale(sale=self.get_object(), user=request.user)
+        except SaleConflict as exc:
+            return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)
+
+        return Response(SaleSerializer(sale).data)
+
+    @action(detail=True, methods=('post',), url_path='cancel')
+    def cancel(self, request, pk=None):
+        try:
+            sale = cancel_sale(sale=self.get_object(), user=request.user)
+        except SaleConflict as exc:
+            return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)
+
+        return Response(SaleSerializer(sale).data)
