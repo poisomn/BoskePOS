@@ -4,8 +4,13 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .permissions import get_user_app_permissions, get_user_roles
+
 
 class UserSerializer(serializers.ModelSerializer):
+    roles = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+
     class Meta:
         model = get_user_model()
         fields = (
@@ -15,9 +20,17 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'is_staff',
             'is_active',
+            'roles',
+            'permissions',
             'date_joined',
         )
         read_only_fields = fields
+
+    def get_roles(self, obj):
+        return sorted(get_user_roles(obj))
+
+    def get_permissions(self, obj):
+        return sorted(get_user_app_permissions(obj))
 
 
 class LoginSerializer(TokenObtainPairSerializer):

@@ -5,6 +5,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import SalePermission
 from apps.inventory.models import Product
 
 from .models import Sale
@@ -25,6 +26,8 @@ class SalePagination(PageNumberPagination):
 
 class PosProductSearchView(generics.ListAPIView):
     serializer_class = PosProductSerializer
+    permission_classes = (SalePermission,)
+    permission_action = 'pos_products'
 
     def get_queryset(self):
         queryset = Product.objects.filter(is_active=True).order_by('name')
@@ -41,6 +44,9 @@ class PosProductSearchView(generics.ListAPIView):
 
 
 class PosCartQuoteView(APIView):
+    permission_classes = (SalePermission,)
+    permission_action = 'pos_quote'
+
     def post(self, request):
         serializer = PosCartQuoteInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -58,6 +64,7 @@ class SaleViewSet(
     pagination_class = SalePagination
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('created_at', 'total', 'status')
+    permission_classes = (SalePermission,)
 
     def get_queryset(self):
         queryset = Sale.objects.select_related('customer', 'user').order_by('-created_at')

@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -8,14 +10,17 @@ from rest_framework.test import APITestCase
 from apps.customers.models import Customer
 from apps.inventory.models import Product, StockMovement
 from apps.sales.models import Sale, SaleItem
+from apps.accounts.permissions import ADMIN_ROLE
 
 
 class PosApiTests(APITestCase):
     def setUp(self):
+        call_command('seed_roles', verbosity=0)
         self.user = get_user_model().objects.create_user(
             email='pos@boskepos.cl',
             password='strong-test-password',
         )
+        self.user.groups.add(Group.objects.get(name=ADMIN_ROLE))
         self.client.force_authenticate(user=self.user)
         self.hammer = Product.objects.create(
             name='Martillo carpintero',
@@ -265,3 +270,4 @@ class PosApiTests(APITestCase):
         response = self.client.get(reverse('sales:sale-list'))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+

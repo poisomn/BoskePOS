@@ -47,7 +47,7 @@ http.interceptors.response.use(
         refresh: refreshToken,
       })
       const { data } = await refreshRequest
-      setTokens({ access: data.access })
+      setTokens({ access: data.access, refresh: data.refresh })
       originalRequest.headers.Authorization = `Bearer ${data.access}`
       return http(originalRequest)
     } catch (refreshError) {

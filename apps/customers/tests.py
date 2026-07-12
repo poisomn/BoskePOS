@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.utils.rut import RutError, normalize_rut
+from apps.accounts.permissions import SELLER_ROLE
 
 from .models import Customer
 
@@ -21,10 +24,12 @@ class RutUtilityTests(APITestCase):
 
 class CustomersApiTests(APITestCase):
     def setUp(self):
+        call_command('seed_roles', verbosity=0)
         self.user = get_user_model().objects.create_user(
             email='customers@boskepos.cl',
             password='strong-test-password',
         )
+        self.user.groups.add(Group.objects.get(name=SELLER_ROLE))
         self.client.force_authenticate(user=self.user)
 
     def test_customer_crud(self):
@@ -153,3 +158,4 @@ class CustomersApiTests(APITestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get(reverse('customers:customer-list'))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+

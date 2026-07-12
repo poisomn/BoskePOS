@@ -3,6 +3,7 @@ import { FiArrowLeft, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { useAuth } from '../../hooks/useAuth'
 import { cancelPurchase, confirmPurchase, getPurchase } from '../../services/purchasesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
@@ -10,6 +11,7 @@ import { formatDateTime, formatMoney } from '../../utils/formatters'
 function PurchaseDetailPage() {
   const navigate = useNavigate()
   const { purchaseId } = useParams()
+  const { hasPermission } = useAuth()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [error, setError] = useState('')
@@ -93,13 +95,13 @@ function PurchaseDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {purchase.status === 'draft' ? (
+            {purchase.status === 'draft' && hasPermission('purchases:confirm') ? (
               <button className="btn btn-primary" onClick={() => setConfirmOpen(true)} type="button">
                 <FiCheckCircle aria-hidden="true" />
                 Confirmar
               </button>
             ) : null}
-            {purchase.status === 'confirmed' ? (
+            {purchase.status === 'confirmed' && hasPermission('purchases:cancel') ? (
               <button className="btn btn-danger" onClick={() => setCancelOpen(true)} type="button">
                 <FiXCircle aria-hidden="true" />
                 Anular

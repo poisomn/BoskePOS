@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
+import { useAuth } from '../../hooks/useAuth'
 import {
   cancelPurchase,
   confirmPurchase,
@@ -21,6 +22,7 @@ const PAGE_SIZE = 8
 
 function PurchasesPage() {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [editingPurchase, setEditingPurchase] = useState(null)
@@ -169,17 +171,21 @@ function PurchasesPage() {
           <button aria-label={`Ver compra ${purchase.id}`} className="icon-btn" onClick={() => navigate(`/purchases/${purchase.id}`)} type="button">
             <FiEye aria-hidden="true" />
           </button>
-          {purchase.status === 'draft' ? (
+          {purchase.status === 'draft' && hasPermission('purchases:write') ? (
             <>
               <button aria-label={`Editar compra ${purchase.id}`} className="icon-btn" onClick={() => openEditModal(purchase)} type="button">
                 <FiEdit2 aria-hidden="true" />
               </button>
+            </>
+          ) : null}
+          {purchase.status === 'draft' && hasPermission('purchases:confirm') ? (
+            <>
               <button aria-label={`Confirmar compra ${purchase.id}`} className="icon-btn" onClick={() => setConfirmTarget(purchase)} type="button">
                 <FiCheckCircle aria-hidden="true" />
               </button>
             </>
           ) : null}
-          {purchase.status === 'confirmed' ? (
+          {purchase.status === 'confirmed' && hasPermission('purchases:cancel') ? (
             <button aria-label={`Anular compra ${purchase.id}`} className="icon-btn" onClick={() => setCancelTarget(purchase)} type="button">
               <FiXCircle aria-hidden="true" />
             </button>
@@ -202,9 +208,11 @@ function PurchasesPage() {
               Registra entradas de mercaderia y confirma inventario con trazabilidad.
             </p>
           </div>
-          <button className="btn btn-primary" onClick={openCreateModal} type="button">
-            Nueva compra
-          </button>
+          {hasPermission('purchases:write') ? (
+            <button className="btn btn-primary" onClick={openCreateModal} type="button">
+              Nueva compra
+            </button>
+          ) : null}
         </div>
       </section>
 

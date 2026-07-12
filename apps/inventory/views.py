@@ -5,6 +5,8 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from apps.accounts.permissions import InventoryPermission, StockMovementPermission
+
 from .models import Category, Product, StockMovement
 from .serializers import (
     CategorySerializer,
@@ -29,6 +31,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     filter_backends = (filters.SearchFilter, filters.OrderingFilter)
     search_fields = ('name',)
     ordering_fields = ('name', 'created_at')
+    permission_classes = (InventoryPermission,)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -92,6 +95,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         'created_at',
         'updated_at',
     )
+    permission_classes = (InventoryPermission,)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -162,12 +166,15 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     'detail': 'El producto asociado a este codigo de barras esta inactivo.',
-                    'product': ProductBarcodeLookupSerializer(product).data,
+                    'product': ProductBarcodeLookupSerializer(
+                        product,
+                        context={'request': request},
+                    ).data,
                 },
                 status=status.HTTP_409_CONFLICT,
             )
 
-        serializer = ProductBarcodeLookupSerializer(product)
+        serializer = ProductBarcodeLookupSerializer(product, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=('post',))
@@ -211,6 +218,7 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = StandardPageNumberPagination
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('created_at', 'movement_type', 'quantity')
+    permission_classes = (StockMovementPermission,)
 
     def get_queryset(self):
         queryset = super().get_queryset()

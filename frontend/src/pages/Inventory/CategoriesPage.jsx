@@ -4,6 +4,7 @@ import { FiEdit2, FiPower, FiRefreshCw } from 'react-icons/fi'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
+import { useAuth } from '../../hooks/useAuth'
 import {
   activateCategory,
   createCategory,
@@ -19,6 +20,8 @@ import InventoryHeader from './InventoryHeader'
 const PAGE_SIZE = 8
 
 function CategoriesPage() {
+  const { hasPermission } = useAuth()
+  const canWriteInventory = hasPermission('inventory:write')
   const [categories, setCategories] = useState([])
   const [editingCategory, setEditingCategory] = useState(null)
   const [categoryToDeactivate, setCategoryToDeactivate] = useState(null)
@@ -181,28 +184,34 @@ function CategoriesPage() {
       header: 'Acciones',
       render: (category) => (
         <div className="flex gap-2">
-          <button aria-label={`Editar ${category.name}`} className="icon-btn" onClick={() => openEditModal(category)} type="button">
-            <FiEdit2 aria-hidden="true" />
-          </button>
-          {category.is_active ? (
-            <button
-              aria-label={`Desactivar ${category.name}`}
-              className="icon-btn"
-              onClick={() => setCategoryToDeactivate(category)}
-              type="button"
-            >
-              <FiPower aria-hidden="true" />
-            </button>
+          {canWriteInventory ? (
+            <>
+              <button aria-label={`Editar ${category.name}`} className="icon-btn" onClick={() => openEditModal(category)} type="button">
+                <FiEdit2 aria-hidden="true" />
+              </button>
+              {category.is_active ? (
+                <button
+                  aria-label={`Desactivar ${category.name}`}
+                  className="icon-btn"
+                  onClick={() => setCategoryToDeactivate(category)}
+                  type="button"
+                >
+                  <FiPower aria-hidden="true" />
+                </button>
+              ) : (
+                <button
+                  aria-label={`Activar ${category.name}`}
+                  className="icon-btn"
+                  disabled={isSubmitting}
+                  onClick={() => handleActivate(category)}
+                  type="button"
+                >
+                  <FiRefreshCw aria-hidden="true" />
+                </button>
+              )}
+            </>
           ) : (
-            <button
-              aria-label={`Activar ${category.name}`}
-              className="icon-btn"
-              disabled={isSubmitting}
-              onClick={() => handleActivate(category)}
-              type="button"
-            >
-              <FiRefreshCw aria-hidden="true" />
-            </button>
+            <span className="badge badge-neutral">Solo lectura</span>
           )}
         </div>
       ),
@@ -213,6 +222,7 @@ function CategoriesPage() {
     <div className="w-full space-y-6">
       <InventoryHeader
         actionLabel="Nueva categoria"
+        canCreate={canWriteInventory}
         onAction={openCreateModal}
         onSearchChange={handleSearchChange}
         search={search}

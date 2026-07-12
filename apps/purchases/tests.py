@@ -1,22 +1,27 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.inventory.models import Category, Product, StockMovement
 from apps.suppliers.models import Supplier
+from apps.accounts.permissions import ADMIN_ROLE
 
 from .models import Purchase
 
 
 class PurchasesApiTests(APITestCase):
     def setUp(self):
+        call_command('seed_roles', verbosity=0)
         self.user = get_user_model().objects.create_user(
             email='purchases@boskepos.cl',
             password='strong-test-password',
         )
+        self.user.groups.add(Group.objects.get(name=ADMIN_ROLE))
         self.client.force_authenticate(user=self.user)
         self.supplier = Supplier.objects.create(name='Proveedor Compra', rut='12345678-5')
         self.category = Category.objects.create(name='Compras Test')
@@ -162,3 +167,4 @@ class PurchasesApiTests(APITestCase):
                 }
             ],
         }
+

@@ -18,6 +18,9 @@ function Navbar() {
         <div className="hidden items-center gap-2 text-sm sm:flex" style={{ color: 'var(--color-text-muted)' }}>
           <FiUser aria-hidden="true" />
           <span>{user?.email}</span>
+          {user?.roles?.length ? (
+            <span className="badge badge-neutral">{user.roles.join(', ')}</span>
+          ) : null}
         </div>
         <button className="btn btn-secondary" type="button" onClick={logout}>
           <FiLogOut aria-hidden="true" />

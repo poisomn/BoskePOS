@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from apps.accounts.permissions import CustomerPermission
 from apps.utils.rut import RutError, normalize_rut
 
 from .models import Customer
@@ -22,6 +23,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
     pagination_class = CustomerPagination
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('name', 'rut', 'created_at', 'updated_at')
+    permission_classes = (CustomerPermission,)
 
     def get_queryset(self):
         queryset = super().get_queryset()

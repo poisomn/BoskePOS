@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { FiEye, FiFileText, FiSearch } from 'react-icons/fi'
 
 import DataTable from '../../components/DataTable'
+import { useAuth } from '../../hooks/useAuth'
 import { listSalesPage } from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
@@ -10,6 +11,7 @@ import { formatDateTime, formatMoney } from '../../utils/formatters'
 const PAGE_SIZE = 10
 
 function SalesHistoryPage() {
+  const { hasPermission } = useAuth()
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -79,9 +81,14 @@ function SalesHistoryPage() {
       key: 'actions',
       header: 'Acciones',
       render: (sale) => (
-        <Link className="icon-btn" to={`/sales/${sale.id}`} aria-label={`Ver venta ${sale.id}`}>
-          <FiEye aria-hidden="true" />
-        </Link>
+        <div className="flex gap-2">
+          <Link className="icon-btn" to={`/sales/${sale.id}`} aria-label={`Ver venta ${sale.id}`}>
+            <FiEye aria-hidden="true" />
+          </Link>
+          {!hasPermission('sales:cancel') && sale.status === 'completed' ? (
+            <span className="badge badge-neutral">Sin anulacion</span>
+          ) : null}
+        </div>
       ),
     },
   ]

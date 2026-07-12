@@ -4,6 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from apps.accounts.permissions import PurchasePermission
+
 from .models import Purchase
 from .serializers import PurchaseListSerializer, PurchaseSerializer, PurchaseWriteSerializer
 from .services import PurchaseConflict, cancel_purchase, confirm_purchase
@@ -19,6 +21,7 @@ class PurchaseViewSet(viewsets.ModelViewSet):
     pagination_class = PurchasePagination
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ('created_at', 'total', 'status')
+    permission_classes = (PurchasePermission,)
 
     def get_queryset(self):
         queryset = Purchase.objects.select_related('supplier', 'user').order_by('-created_at')

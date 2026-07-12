@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.accounts.permissions import can_view_costs
+
 from .models import Category, Product, StockMovement
 from .services import apply_stock_movement
 
@@ -123,6 +125,13 @@ class ProductSerializer(serializers.ModelSerializer):
 
         return value
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if not request or not can_view_costs(request.user):
+            data.pop('cost_price', None)
+        return data
+
 
 class ProductBarcodeLookupSerializer(serializers.ModelSerializer):
     category_detail = CategorySerializer(source='category', read_only=True)
@@ -143,6 +152,13 @@ class ProductBarcodeLookupSerializer(serializers.ModelSerializer):
             'is_active',
         )
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        if not request or not can_view_costs(request.user):
+            data.pop('cost_price', None)
+        return data
 
 
 class StockMovementProductSerializer(serializers.ModelSerializer):

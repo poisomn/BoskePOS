@@ -5,6 +5,7 @@ import BarcodeInput from '../../components/BarcodeInput'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import DataTable from '../../components/DataTable'
 import FormModal from '../../components/FormModal'
+import { useAuth } from '../../hooks/useAuth'
 import {
   activateProduct,
   adjustProductStock,
@@ -32,6 +33,11 @@ const MOVEMENT_TYPES = [
 const DECREASE_MOVEMENTS = new Set(['exit', 'negative_adjustment'])
 
 function ProductsPage() {
+  const { hasPermission } = useAuth()
+  const canAdjustStock = hasPermission('inventory:adjust_stock')
+  const canViewCosts = hasPermission('inventory:view_costs')
+  const canViewMovements = hasPermission('stock_movements:read')
+  const canWriteInventory = hasPermission('inventory:write')
   const [adjustmentForm, setAdjustmentForm] = useState({
     movement_type: 'positive_adjustment',
     quantity: '1',
@@ -118,8 +124,10 @@ function ProductsPage() {
   }, [fetchProducts])
 
   useEffect(() => {
-    queueMicrotask(fetchMovements)
-  }, [fetchMovements])
+    if (canViewMovements) {
+      queueMicrotask(fetchMovements)
+    }
+  }, [canViewMovements, fetchMovements])
 
   const emptyMessage = useMemo(() => {
     if (isLoading) {
@@ -410,11 +418,15 @@ function ProductsPage() {
         </div>
       ),
     },
-    {
-      key: 'cost_price',
-      header: 'Costo',
-      render: (product) => formatMoney(product.cost_price),
-    },
+    ...(canViewCosts
+      ? [
+          {
+            key: 'cost_price',
+            header: 'Costo',
+            render: (product) => formatMoney(product.cost_price),
+          },
+        ]
+      : []),
     {
       key: 'sale_price',
       header: 'Precio venta',
@@ -441,37 +453,44 @@ function ProductsPage() {
       header: 'Acciones',
       render: (product) => (
         <div className="flex gap-2">
-          <button aria-label={`Editar ${product.name}`} className="icon-btn" onClick={() => openEditModal(product)} type="button">
-            <FiEdit2 aria-hidden="true" />
-          </button>
-          <button
-            aria-label={`Ajustar stock de ${product.name}`}
-            className="icon-btn"
-            onClick={() => openAdjustmentModal(product)}
-            type="button"
-          >
-            <FiPackage aria-hidden="true" />
-          </button>
-          {product.is_active ? (
+          {canWriteInventory ? (
+            <button aria-label={`Editar ${product.name}`} className="icon-btn" onClick={() => openEditModal(product)} type="button">
+              <FiEdit2 aria-hidden="true" />
+            </button>
+          ) : null}
+          {canAdjustStock ? (
             <button
-              aria-label={`Desactivar ${product.name}`}
+              aria-label={`Ajustar stock de ${product.name}`}
               className="icon-btn"
-              onClick={() => setProductToDeactivate(product)}
+              onClick={() => openAdjustmentModal(product)}
               type="button"
             >
-              <FiPower aria-hidden="true" />
+              <FiPackage aria-hidden="true" />
             </button>
-          ) : (
-            <button
-              aria-label={`Activar ${product.name}`}
-              className="icon-btn"
-              disabled={isSubmitting}
-              onClick={() => handleActivate(product)}
-              type="button"
-            >
-              <FiRefreshCw aria-hidden="true" />
-            </button>
-          )}
+          ) : null}
+          {canWriteInventory ? (
+            product.is_active ? (
+              <button
+                aria-label={`Desactivar ${product.name}`}
+                className="icon-btn"
+                onClick={() => setProductToDeactivate(product)}
+                type="button"
+              >
+                <FiPower aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                aria-label={`Activar ${product.name}`}
+                className="icon-btn"
+                disabled={isSubmitting}
+                onClick={() => handleActivate(product)}
+                type="button"
+              >
+                <FiRefreshCw aria-hidden="true" />
+              </button>
+            )
+          ) : null}
+          {!canWriteInventory && !canAdjustStock ? <span className="badge badge-neutral">Solo lectura</span> : null}
         </div>
       ),
     },
@@ -481,6 +500,7 @@ function ProductsPage() {
     <div className="w-full space-y-6">
       <InventoryHeader
         actionLabel="Nuevo producto"
+        canCreate={canWriteInventory}
         onAction={openCreateModal}
         onSearchChange={handleSearchChange}
         search={search}
@@ -691,6 +711,7 @@ function ProductsPage() {
         </div>
       </FormModal>
 
+      {canViewMovements ? (
       <section className="surface space-y-4 p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -736,6 +757,7 @@ function ProductsPage() {
           total={movementTotal}
         />
       </section>
+      ) : null}
     </div>
   )
 }

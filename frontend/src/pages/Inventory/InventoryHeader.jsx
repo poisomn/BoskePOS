@@ -1,6 +1,6 @@
 import { FiSearch } from 'react-icons/fi'
 
-function InventoryHeader({ actionLabel, onAction, onSearchChange, search, subtitle, title }) {
+function InventoryHeader({ actionLabel, canCreate = true, onAction, onSearchChange, search, subtitle, title }) {
   return (
     <section className="surface p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -24,9 +24,11 @@ function InventoryHeader({ actionLabel, onAction, onSearchChange, search, subtit
               value={search}
             />
           </label>
-          <button className="btn btn-primary" onClick={onAction} type="button">
-            {actionLabel}
-          </button>
+          {canCreate ? (
+            <button className="btn btn-primary" onClick={onAction} type="button">
+              {actionLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </section>

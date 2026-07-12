@@ -1,20 +1,25 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import Category, Product, StockMovement
 from .services import StockMovementError, apply_stock_movement
+from apps.accounts.permissions import INVENTORY_ROLE
 
 
 class InventoryApiTests(APITestCase):
     def setUp(self):
+        call_command('seed_roles', verbosity=0)
         self.user = get_user_model().objects.create_user(
             email='inventory@boskepos.cl',
             password='strong-test-password',
         )
+        self.user.groups.add(Group.objects.get(name=INVENTORY_ROLE))
         self.client.force_authenticate(user=self.user)
 
     def test_category_crud(self):
@@ -545,7 +550,7 @@ class InventoryApiTests(APITestCase):
             sale_price=Decimal('1000.00'),
         )
 
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             response = self.client.get(reverse('inventory:product-list'))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -692,7 +697,7 @@ class InventoryApiTests(APITestCase):
             sale_price=Decimal('1000.00'),
         )
 
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             response = self.client.get(
                 reverse('inventory:product-by-barcode', args=['780000000600'])
             )
@@ -975,7 +980,8 @@ class InventoryApiTests(APITestCase):
             user=self.user,
         )
 
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             response = self.client.get(reverse('inventory:movement-list'))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+

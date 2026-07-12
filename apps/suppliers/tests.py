@@ -1,17 +1,22 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import Supplier
+from apps.accounts.permissions import INVENTORY_ROLE
 
 
 class SuppliersApiTests(APITestCase):
     def setUp(self):
+        call_command('seed_roles', verbosity=0)
         self.user = get_user_model().objects.create_user(
             email='suppliers@boskepos.cl',
             password='strong-test-password',
         )
+        self.user.groups.add(Group.objects.get(name=INVENTORY_ROLE))
         self.client.force_authenticate(user=self.user)
 
     def test_supplier_crud_normalizes_rut(self):
@@ -134,3 +139,4 @@ class SuppliersApiTests(APITestCase):
         self.client.force_authenticate(user=None)
         auth_response = self.client.get(reverse('suppliers:supplier-list'))
         self.assertEqual(auth_response.status_code, status.HTTP_401_UNAUTHORIZED)
+

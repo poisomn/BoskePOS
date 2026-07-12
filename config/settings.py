@@ -173,4 +173,6 @@ SIMPLE_JWT = {
         days=config('JWT_REFRESH_TOKEN_DAYS', default=7, cast=int)
     ),
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
 }

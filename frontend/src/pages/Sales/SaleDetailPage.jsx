@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { FiArrowLeft, FiCheckCircle, FiFileText, FiXCircle } from 'react-icons/fi'
 
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { useAuth } from '../../hooks/useAuth'
 import { cancelSale, getSale } from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
@@ -10,6 +11,7 @@ import { formatDateTime, formatMoney } from '../../utils/formatters'
 function SaleDetailPage() {
   const { saleId } = useParams()
   const location = useLocation()
+  const { hasPermission } = useAuth()
   const [error, setError] = useState('')
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -107,7 +109,7 @@ function SaleDetailPage() {
           </div>
 
           <div className="flex gap-2">
-            {sale.status === 'completed' ? (
+            {sale.status === 'completed' && hasPermission('sales:cancel') ? (
               <button className="btn btn-danger" onClick={() => setIsCancelOpen(true)} type="button">
                 <FiXCircle aria-hidden="true" />
                 Anular

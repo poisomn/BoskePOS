@@ -6,6 +6,7 @@ import {
   logoutRequest,
 } from '../services/authService'
 import { clearTokens, getRefreshToken, setTokens } from '../utils/tokenStorage'
+import { hasAnyPermission, hasPermission, hasRole } from '../utils/permissions'
 import { AuthContext } from './authContextValue'
 
 export function AuthProvider({ children }) {
@@ -90,6 +91,9 @@ export function AuthProvider({ children }) {
       isSubmitting,
       login,
       logout,
+      hasPermission: (permission) => hasPermission(user, permission),
+      hasAnyPermission: (permissions) => hasAnyPermission(user, permissions),
+      hasRole: (role) => hasRole(user, role),
     }),
     [isBootstrapping, isSubmitting, login, logout, user],
   )
