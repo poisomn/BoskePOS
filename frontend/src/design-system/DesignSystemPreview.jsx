@@ -17,13 +17,14 @@ import {
 } from 'react-icons/fi'
 
 const colorTokens = [
-  ['Brand 600', '#e07000'],
-  ['Brand 500', '#f27a00'],
-  ['Brand 300', '#fdba74'],
-  ['Steel 800', '#2d3337'],
-  ['Steel 600', '#596268'],
-  ['Steel 200', '#d8dddf'],
-  ['White', '#ffffff'],
+  ['Primary', 'var(--primary)'],
+  ['Accent', 'var(--accent)'],
+  ['Card', 'var(--card)'],
+  ['Foreground', 'var(--foreground)'],
+  ['Muted', 'var(--muted)'],
+  ['Border', 'var(--border)'],
+  ['Success', 'var(--status-success)'],
+  ['Danger', 'var(--status-danger)'],
 ]
 
 const navItems = [

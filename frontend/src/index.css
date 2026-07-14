@@ -1,65 +1,132 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
 
-  --color-brand-50: #fff7ed;
+  --background: #f6f7f8;
+  --foreground: #151821;
+  --card: #ffffff;
+  --card-foreground: #151821;
+  --popover: #ffffff;
+  --popover-foreground: #151821;
+  --primary: #d97706;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f4f7;
+  --secondary-foreground: #151821;
+  --muted: #f2f4f7;
+  --muted-foreground: #667085;
+  --accent: #fff7ed;
+  --accent-foreground: #9a4d00;
+  --destructive: #b91c1c;
+  --border: #e7e9ee;
+  --input: #e7e9ee;
+  --ring: #d97706;
+  --radius: 0.75rem;
+
+  --status-success: #15803d;
+  --status-success-bg: #f0fdf4;
+  --status-success-border: #bbf7d0;
+  --status-warning: #b45309;
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: #fde68a;
+  --status-danger: #b91c1c;
+  --status-danger-bg: #fef2f2;
+  --status-danger-border: #fecaca;
+  --status-info: #2563eb;
+  --status-info-bg: #eff6ff;
+  --status-info-border: #bfdbfe;
+
+  --chart-1: var(--primary);
+  --chart-2: var(--status-info);
+  --chart-3: var(--status-success);
+  --chart-4: var(--status-warning);
+  --chart-5: var(--status-danger);
+
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --color-brand-50: var(--accent);
   --color-brand-100: #ffedd5;
   --color-brand-200: #fed7aa;
   --color-brand-300: #fdba74;
   --color-brand-400: #fb923c;
-  --color-brand-500: #f27a00;
-  --color-brand-600: #e07000;
-  --color-brand-700: #b95600;
-  --color-brand-800: #8f4300;
-  --color-brand-900: #6f3400;
+  --color-brand-500: #f59e0b;
+  --color-brand-600: var(--primary);
+  --color-brand-700: var(--accent-foreground);
+  --color-brand-800: #78350f;
+  --color-brand-900: #451a03;
 
-  --color-steel-50: #f7f8f8;
-  --color-steel-100: #eef0f1;
-  --color-steel-200: #d8dddf;
-  --color-steel-300: #b8c1c5;
-  --color-steel-400: #8f9ba1;
-  --color-steel-500: #6f7a80;
-  --color-steel-600: #596268;
-  --color-steel-700: #434b50;
-  --color-steel-800: #2d3337;
-  --color-steel-900: #1b2024;
+  --color-steel-50: var(--background);
+  --color-steel-100: var(--muted);
+  --color-steel-200: var(--border);
+  --color-steel-300: #d0d5dd;
+  --color-steel-400: #98a2b3;
+  --color-steel-500: var(--muted-foreground);
+  --color-steel-600: #475467;
+  --color-steel-700: #344054;
+  --color-steel-800: #1d2939;
+  --color-steel-900: var(--foreground);
 
-  --color-bg: #f7f8f8;
-  --color-surface: #ffffff;
-  --color-surface-muted: #f1f3f4;
-  --color-border: #d8dddf;
-  --color-text: #1b2024;
-  --color-text-muted: #596268;
-  --color-focus: #f27a00;
+  --color-bg: var(--background);
+  --color-surface: var(--card);
+  --color-surface-muted: var(--muted);
+  --color-border: var(--border);
+  --color-text: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-focus: var(--ring);
 
-  --color-success: #15803d;
-  --color-success-bg: #f0fdf4;
-  --color-warning: #b45309;
-  --color-warning-bg: #fffbeb;
-  --color-error: #b91c1c;
-  --color-error-bg: #fef2f2;
-  --color-info: #0369a1;
-  --color-info-bg: #f0f9ff;
+  --color-success: var(--status-success);
+  --color-success-bg: var(--status-success-bg);
+  --color-warning: var(--status-warning);
+  --color-warning-bg: var(--status-warning-bg);
+  --color-error: var(--status-danger);
+  --color-error-bg: var(--status-danger-bg);
+  --color-info: var(--status-info);
+  --color-info-bg: var(--status-info-bg);
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --shadow-xs: 0 1px 2px rgb(27 32 36 / 0.06);
-  --shadow-sm: 0 1px 3px rgb(27 32 36 / 0.10), 0 1px 2px rgb(27 32 36 / 0.06);
-  --shadow-md: 0 8px 20px rgb(27 32 36 / 0.12);
-  --shadow-modal: 0 24px 60px rgb(27 32 36 / 0.22);
-}
-
-.theme-dark {
-  --color-bg: #111417;
-  --color-surface: #1b2024;
-  --color-surface-muted: #2d3337;
-  --color-border: #434b50;
-  --color-text: #f7f8f8;
-  --color-text-muted: #b8c1c5;
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --shadow-xs: 0 1px 2px rgb(21 24 33 / 0.06);
+  --shadow-sm: 0 1px 3px rgb(21 24 33 / 0.10), 0 1px 2px rgb(21 24 33 / 0.06);
+  --shadow-md: 0 8px 20px rgb(21 24 33 / 0.12);
+  --shadow-modal: 0 24px 60px rgb(21 24 33 / 0.22);
+  --chart-background: var(--card);
+  --chart-foreground: var(--foreground);
+  --chart-foreground-muted: var(--muted-foreground);
+  --chart-label: var(--muted-foreground);
+  --chart-grid: var(--border);
+  --chart-crosshair: var(--primary);
+  --chart-indicator-color: var(--primary);
+  --chart-indicator-secondary-color: var(--secondary-foreground);
+  --chart-line-primary: var(--primary);
+  --chart-line-secondary: var(--secondary-foreground);
+  --chart-brush-border: var(--border);
+  --chart-tooltip-background: var(--popover);
+  --chart-tooltip-foreground: var(--popover-foreground);
+  --chart-tooltip-muted: var(--muted-foreground);
+  --chart-marker-background: var(--card);
+  --chart-marker-border: var(--border);
+  --chart-marker-foreground: var(--foreground);
+  --chart-scale-01: var(--accent);
+  --chart-scale-02: var(--muted);
+  --chart-scale-03: var(--border);
+  --chart-scale-04: var(--color-steel-300);
+  --chart-scale-05: var(--muted-foreground);
+  --chart-scale-pattern-color: var(--background);
 }
 
 body {
@@ -252,25 +319,25 @@ select {
 
   .alert-success {
     background: var(--color-success-bg);
-    border-color: #bbf7d0;
+    border-color: var(--status-success-border);
     color: var(--color-success);
   }
 
   .alert-warning {
     background: var(--color-warning-bg);
-    border-color: #fde68a;
+    border-color: var(--status-warning-border);
     color: var(--color-warning);
   }
 
   .alert-error {
     background: var(--color-error-bg);
-    border-color: #fecaca;
+    border-color: var(--status-danger-border);
     color: var(--color-error);
   }
 
   .alert-info {
     background: var(--color-info-bg);
-    border-color: #bae6fd;
+    border-color: var(--status-info-border);
     color: var(--color-info);
   }
 
@@ -300,5 +367,142 @@ select {
   .nav-item-active {
     background: var(--color-brand-50);
     color: var(--color-brand-700);
+  }
+}
+
+@theme inline {
+  --font-heading:
+    var(--font-sans);
+  --font-sans:
+    'Geist Variable', sans-serif;
+  --color-sidebar-ring:
+    var(--sidebar-ring);
+  --color-sidebar-border:
+    var(--sidebar-border);
+  --color-sidebar-accent-foreground:
+    var(--sidebar-accent-foreground);
+  --color-sidebar-accent:
+    var(--sidebar-accent);
+  --color-sidebar-primary-foreground:
+    var(--sidebar-primary-foreground);
+  --color-sidebar-primary:
+    var(--sidebar-primary);
+  --color-sidebar-foreground:
+    var(--sidebar-foreground);
+  --color-sidebar:
+    var(--sidebar);
+  --color-chart-5:
+    var(--chart-5);
+  --color-chart-4:
+    var(--chart-4);
+  --color-chart-3:
+    var(--chart-3);
+  --color-chart-2:
+    var(--chart-2);
+  --color-chart-1:
+    var(--chart-1);
+  --color-ring:
+    var(--ring);
+  --color-input:
+    var(--input);
+  --color-border:
+    var(--border);
+  --color-destructive:
+    var(--destructive);
+  --color-accent-foreground:
+    var(--accent-foreground);
+  --color-accent:
+    var(--accent);
+  --color-muted-foreground:
+    var(--muted-foreground);
+  --color-muted:
+    var(--muted);
+  --color-secondary-foreground:
+    var(--secondary-foreground);
+  --color-secondary:
+    var(--secondary);
+  --color-primary-foreground:
+    var(--primary-foreground);
+  --color-primary:
+    var(--primary);
+  --color-popover-foreground:
+    var(--popover-foreground);
+  --color-popover:
+    var(--popover);
+  --color-card-foreground:
+    var(--card-foreground);
+  --color-card:
+    var(--card);
+  --color-foreground:
+    var(--foreground);
+  --color-background:
+    var(--background);
+  --radius-sm:
+    calc(var(--radius) * 0.6);
+  --radius-md:
+    calc(var(--radius) * 0.8);
+  --radius-lg:
+    var(--radius);
+  --radius-xl:
+    calc(var(--radius) * 1.4);
+  --radius-2xl:
+    calc(var(--radius) * 1.8);
+  --radius-3xl:
+    calc(var(--radius) * 2.2);
+  --radius-4xl:
+    calc(var(--radius) * 2.6);
+  --color-chart-scale-pattern-color:
+    var(--chart-scale-pattern-color);
+  --color-chart-scale-05:
+    var(--chart-scale-05);
+  --color-chart-scale-04:
+    var(--chart-scale-04);
+  --color-chart-scale-03:
+    var(--chart-scale-03);
+  --color-chart-scale-02:
+    var(--chart-scale-02);
+  --color-chart-scale-01:
+    var(--chart-scale-01);
+  --color-chart-label:
+    var(--chart-label);
+  --color-chart-marker-foreground:
+    var(--chart-marker-foreground);
+  --color-chart-marker-border:
+    var(--chart-marker-border);
+  --color-chart-marker-background:
+    var(--chart-marker-background);
+  --color-chart-tooltip-muted:
+    var(--chart-tooltip-muted);
+  --color-chart-tooltip-foreground:
+    var(--chart-tooltip-foreground);
+  --color-chart-tooltip-background:
+    var(--chart-tooltip-background);
+  --chart-brush-border:
+    var(--chart-brush-border);
+  --color-chart-grid:
+    var(--chart-grid);
+  --color-chart-crosshair:
+    var(--chart-crosshair);
+  --chart-line-secondary:
+    var(--chart-line-secondary);
+  --chart-line-primary:
+    var(--chart-line-primary);
+  --color-chart-foreground-muted:
+    var(--chart-foreground-muted);
+  --color-chart-foreground:
+    var(--chart-foreground);
+  --color-chart-background:
+    var(--chart-background);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }

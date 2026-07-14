@@ -17,7 +17,6 @@ function PurchaseForm({ fieldErrors = {}, isSubmitting, onCancel, onSubmit, purc
   const [productSearch, setProductSearch] = useState('')
   const [reference, setReference] = useState(purchase?.reference ?? '')
   const [notes, setNotes] = useState(purchase?.notes ?? '')
-  const [selectedProductId, setSelectedProductId] = useState('')
   const [supplierId, setSupplierId] = useState(purchase?.supplier ? String(purchase.supplier) : '')
   const [suppliers, setSuppliers] = useState([])
 
@@ -86,12 +85,6 @@ function PurchaseForm({ fieldErrors = {}, isSubmitting, onCancel, onSubmit, purc
       ]
     })
   }, [])
-
-  function handleAddSelectedProduct() {
-    const product = productOptions.find((option) => String(option.id) === String(selectedProductId))
-    addProduct(product)
-    setSelectedProductId('')
-  }
 
   async function handleBarcodeSubmit(barcode) {
     setIsBarcodeLoading(true)
@@ -187,28 +180,12 @@ function PurchaseForm({ fieldErrors = {}, isSubmitting, onCancel, onSubmit, purc
         </label>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-        <label>
-          <span className="field-label">Producto</span>
-          <select
-            className="select"
-            disabled={isLoadingProducts}
-            onChange={(event) => setSelectedProductId(event.target.value)}
-            value={selectedProductId}
-          >
-            <option value="">Seleccionar producto</option>
-            {productOptions.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name} - {product.sku}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="btn btn-secondary" disabled={!selectedProductId} onClick={handleAddSelectedProduct} type="button">
-          <FiPlus aria-hidden="true" />
-          Agregar
-        </button>
-      </div>
+      <ProductPicker
+        isLoading={isLoadingProducts}
+        onAddProduct={addProduct}
+        products={productOptions}
+        search={productSearch}
+      />
 
       <div className="surface p-4">
         <BarcodeInput
@@ -316,6 +293,72 @@ function FieldError({ error }) {
   if (!error) return null
   const message = Array.isArray(error) ? error[0] : error
   return <p className="mt-1 text-xs text-red-700">{message}</p>
+}
+
+function ProductPicker({ isLoading, onAddProduct, products, search }) {
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-dashed p-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+        Buscando productos...
+      </div>
+    )
+  }
+
+  if (!search.trim()) {
+    return (
+      <div className="rounded-lg border border-dashed p-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+        Escribe en la barra de busqueda para seleccionar productos. Tambien puedes usar el lector de codigo de barras.
+      </div>
+    )
+  }
+
+  if (!products.length) {
+    return (
+      <div className="rounded-lg border border-dashed p-4 text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+        No hay productos que coincidan con la busqueda.
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border bg-white" style={{ borderColor: 'var(--color-border)' }}>
+      <div className="border-b px-4 py-3" style={{ borderColor: 'var(--color-border)' }}>
+        <p className="text-sm font-semibold">Resultados de productos</p>
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          La misma barra busca por nombre, SKU o codigo; agrega desde esta lista.
+        </p>
+      </div>
+      <div className="max-h-64 overflow-auto p-2">
+        {products.slice(0, 8).map((product) => (
+          <button
+            className="grid w-full gap-3 rounded-md border bg-white p-3 text-left transition hover:bg-[var(--color-steel-50)] sm:grid-cols-[minmax(0,1fr)_120px_auto]"
+            key={product.id}
+            onClick={() => onAddProduct(product)}
+            style={{ borderColor: 'var(--color-border)' }}
+            type="button"
+          >
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{product.name}</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                SKU {product.sku}
+                {product.barcode ? ` - ${product.barcode}` : ''}
+              </p>
+            </div>
+            <div className="text-sm">
+              <p className="font-semibold">{formatMoney(product.cost_price ?? 0)}</p>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Costo actual
+              </p>
+            </div>
+            <span className="btn btn-secondary h-9 px-3">
+              <FiPlus aria-hidden="true" />
+              Agregar
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function mapPurchaseLines(purchase) {

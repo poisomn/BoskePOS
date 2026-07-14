@@ -17,5 +17,21 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        { allowExportNames: ['buttonVariants'] },
+      ],
+    },
+  },
+  {
+    files: ['src/components/charts/**/*.{js,jsx}'],
+    rules: {
+      'no-useless-assignment': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

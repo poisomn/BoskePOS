@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BoskePOS Wireframe</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=general-sans@500,600,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f6f7f8;
+      --surface: #ffffff;
+      --surface-2: #fbfbfc;
+      --surface-accent: #fff7ed;
+      --border: #e7e9ee;
+      --text: #151821;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --accent: #d97706;
+      --accent-2: #2563eb;
+      --success: #15803d;
+      --warning: #b45309;
+      --danger: #b91c1c;
+      --shadow: 0 10px 30px rgba(16,24,40,.04);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --sidebar: 228px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Satoshi', system-ui, sans-serif;
+      line-height: 1.4;
+    }
+    h1,h2,h3,h4 { margin: 0; font-family: 'General Sans', 'Satoshi', sans-serif; }
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar) 1fr;
+      min-height: 100vh;
+    }
+    .sidebar {
+      background: #f8f9fb;
+      border-right: 1px solid var(--border);
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px 18px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      position: relative;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.45);
+    }
+    .logo-mark:before, .logo-mark:after {
+      content: ""; position: absolute; inset: 7px;
+      border: 2px solid rgba(255,255,255,.9); border-radius: 6px;
+      transform: rotate(45deg);
+    }
+    .logo small { color: var(--muted); display:block; font-size: 12px; }
+    .nav { display: grid; gap: 6px; }
+    .nav a {
+      text-decoration: none; color: var(--text);
+      padding: 12px 14px; border-radius: 12px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px;
+      border: 1px solid transparent;
+    }
+    .nav a.active { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); }
+    .nav .dot { width: 8px; height: 8px; border-radius: 999px; background: #d0d5dd; }
+    .nav a.active .dot { background: var(--accent); }
+
+    .main { padding: 24px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px; gap: 16px;
+    }
+    .title-wrap p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .input, .btn, .chip, .seg button {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 12px;
+      min-height: 44px;
+      padding: 0 14px;
+      font: inherit;
+      color: inherit;
+    }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    .btn.ghost { background: transparent; }
+    .seg {
+      display: inline-grid; grid-auto-flow: column; gap: 6px; padding: 4px;
+      border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+    }
+    .seg button.active { background: var(--surface-accent); border-color: #fed7aa; color: #9a4d00; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .section-title {
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 12px; margin-bottom: 14px;
+    }
+    .tag {
+      height: 28px; padding: 0 10px; display:inline-flex; align-items:center;
+      border-radius: 999px; background: #f2f4f7; color: var(--muted); font-size: 12px; border:1px solid var(--border);
+    }
+
+    .dashboard-grid {
+      display: grid; gap: 18px;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+    .hero { grid-column: 1 / -1; padding: 22px; }
+    .kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 18px; }
+    .kpi { padding: 18px; min-height: 152px; display:grid; gap:12px; }
+    .kpi .value { font-size: 34px; font-weight: 700; letter-spacing: -.03em; }
+    .kpi .meta { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .delta { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; }
+    .delta.up { background: #ecfdf3; color: var(--success); }
+    .delta.warn { background: #fff7ed; color: var(--warning); }
+    .delta.down { background: #fef3f2; color: var(--danger); }
+    .spark {
+      height: 40px; border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(217,119,6,.10), rgba(217,119,6,0) 70%),
+        linear-gradient(90deg, rgba(152,162,179,.16) 1px, transparent 1px) 0 0/14px 100%,
+        linear-gradient(135deg, transparent 8px, rgba(217,119,6,.7) 8px, rgba(217,119,6,.7) 10px, transparent 10px) 0 20px/38px 38px;
+    }
+    .main-chart { grid-column: span 8; padding: 18px; min-height: 350px; }
+    .side-stack { grid-column: span 4; display:grid; gap:18px; }
+    .panel { padding: 18px; min-height: 166px; }
+    .chart-area {
+      margin-top: 18px; height: 250px; border-radius: 16px; padding: 18px;
+      background:
+        linear-gradient(180deg, rgba(37,99,235,.04), rgba(37,99,235,0)),
+        linear-gradient(0deg, rgba(16,24,40,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16,24,40,.04) 1px, transparent 1px);
+      background-size: auto, 100% 48px, 56px 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .chart-area:before {
+      content: ""; position: absolute; inset: 40px 18px 24px 18px;
+      border-bottom: 2px solid rgba(37,99,235,.22);
+      clip-path: polygon(0% 85%, 10% 72%, 18% 78%, 28% 58%, 39% 66%, 48% 42%, 60% 49%, 69% 28%, 77% 34%, 88% 16%, 100% 24%, 100% 100%, 0% 100%);
+      background: linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,0));
+    }
+    .bars {
+      display:grid; gap:12px; margin-top:14px;
+    }
+    .bar-row { display:grid; grid-template-columns: 1.4fr 4fr auto; gap:12px; align-items:center; font-size:14px; }
+    .bar-track { height: 10px; border-radius: 999px; background: #f2f4f7; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .donut {
+      width: 150px; height: 150px; border-radius: 50%; margin: 12px auto 16px;
+      background: conic-gradient(#15803d 0 72%, #f59e0b 72% 92%, #dc2626 92% 100%);
+      position: relative;
+    }
+    .donut:after {
+      content: ""; position: absolute; inset: 22px; background: var(--surface); border-radius: 50%;
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+    .donut-label {
+      position:absolute; inset:0; display:grid; place-items:center; z-index:1; text-align:center;
+      font-size: 12px; color: var(--muted);
+    }
+    .donut-label strong { display:block; font-size: 28px; color: var(--text); }
+    .legend { display:grid; gap:10px; }
+    .legend div { display:flex; justify-content:space-between; gap:10px; font-size:14px; }
+    .legend span:first-child { display:flex; align-items:center; gap:8px; }
+    .legend i { width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .table-card { padding: 18px; min-height: 240px; }
+    .table-card.wide { grid-column: span 6; }
+    table { width:100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 10px; text-align:left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .actions { grid-column: 1 / -1; padding: 18px; }
+    .quick-grid { display:grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap:14px; }
+    .quick {
+      border:1px solid var(--border); border-radius:16px; background: linear-gradient(180deg, #fff, #fafbfc);
+      padding:18px; min-height: 104px; display:grid; gap:8px;
+    }
+    .quick strong { font-size: 15px; }
+    .quick p { margin:0; font-size: 13px; color: var(--muted); }
+
+    .divider-title {
+      margin: 38px 0 18px; display:flex; align-items:center; gap:12px;
+    }
+    .divider-title:after { content:""; height:1px; flex:1; background: var(--border); }
+
+    .pos-shell {
+      display:grid; grid-template-columns: 1.6fr .9fr; gap: 18px;
+    }
+    .pos-main, .pos-side { padding: 18px; }
+    .status-row {
+      display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px;
+    }
+    .status-box {
+      border:1px solid var(--border); border-radius: 14px; background: var(--surface-2);
+      padding: 12px 14px;
+    }
+    .status-box small { color: var(--muted); display:block; margin-bottom:6px; }
+    .status-box strong { font-size: 14px; }
+    .search-hero {
+      border:1.5px solid #fed7aa; background: linear-gradient(180deg, #fff, #fff7ed);
+      border-radius: 16px; padding: 16px; margin-bottom: 16px;
+    }
+    .search-hero label, .field label { display:block; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+    .search-input {
+      min-height: 60px; display:flex; align-items:center; justify-content:space-between;
+      padding: 0 16px; border:1px solid var(--border); border-radius: 14px; background:#fff;
+      font-size: 18px;
+    }
+    .search-input span { color: var(--faint); }
+    .hint-row { display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px; }
+    .hint { font-size: 12px; color: #9a4d00; background: #ffedd5; border:1px solid #fed7aa; border-radius:999px; padding: 6px 10px; }
+    .pos-grid {
+      display:grid; grid-template-columns: 1.25fr .75fr; gap: 16px;
+    }
+    .results-card, .cart-card, .payment-card, .shortcut-card { border:1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .results-card { min-height: 420px; }
+    .card-head {
+      padding: 14px 16px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; gap: 10px; align-items:center;
+    }
+    .card-body { padding: 12px 16px 16px; }
+    .tabs { display:flex; gap:8px; }
+    .tabs span {
+      height: 32px; display:inline-flex; align-items:center; padding: 0 12px; border-radius: 999px;
+      border:1px solid var(--border); font-size: 12px; color: var(--muted);
+    }
+    .tabs span.active { background: var(--surface-accent); border-color:#fed7aa; color:#9a4d00; }
+    .result-row {
+      display:grid; grid-template-columns: 1.5fr .6fr .6fr auto; gap: 12px; align-items:center;
+      padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .result-row small { color: var(--muted); display:block; margin-top: 3px; }
+    .stock { color: var(--muted); }
+    .add-btn {
+      height: 38px; padding: 0 12px; border-radius: 10px; border:1px solid var(--border); background: #fff;
+      font-weight: 700;
+    }
+    .cart-card { display:grid; grid-template-rows: auto 1fr auto; min-height: 420px; }
+    .cart-item {
+      padding: 14px 0; border-bottom:1px solid var(--border);
+    }
+    .cart-top, .cart-bottom, .cart-qty { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+    .cart-qty { margin-top: 10px; }
+    .qty-step {
+      display:inline-grid; grid-auto-flow:column; gap:8px; align-items:center;
+      border:1px solid var(--border); border-radius: 12px; padding: 4px;
+    }
+    .qty-step span { width: 34px; height: 34px; display:grid; place-items:center; border-radius: 10px; background: #f8fafc; }
+    .totals {
+      border-top:1px solid var(--border); padding: 16px;
+      background: linear-gradient(180deg, #fff, #fafbfd);
+    }
+    .totals .line { display:flex; justify-content:space-between; padding: 7px 0; font-size: 14px; }
+    .grand {
+      display:flex; justify-content:space-between; align-items:end; margin: 12px 0 16px;
+    }
+    .grand strong:last-child { font-size: 34px; letter-spacing: -.03em; color: var(--accent); }
+    .pay-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 12px; }
+    .pay-pill {
+      min-height: 44px; border-radius: 12px; border:1px solid var(--border); display:grid; place-items:center; background:#fff;
+      font-size: 14px;
+    }
+    .pay-pill.active { background: var(--surface-accent); border-color:#fed7aa; color:#9a4d00; font-weight:700; }
+    .shortcut-card { margin-top: 16px; }
+    .shortcut-grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:10px; }
+    .shortcut {
+      border:1px solid var(--border); border-radius: 14px; padding: 12px; background: #fcfcfd;
+    }
+    .shortcut small { color: var(--muted); display:block; margin-top: 4px; }
+
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display:none; }
+      .kpis, .quick-grid, .status-row, .pos-grid, .pos-shell { grid-template-columns: 1fr; }
+      .main-chart, .side-stack, .table-card.wide { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark" aria-hidden="true"></div>
+        <div>
+          <strong>BOSKEPOS</strong>
+          <small>Sistema operativo ferretería</small>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Navegación principal">
+        <a class="active" href="#dashboard"><span class="dot"></span>Dashboard</a>
+        <a href="#pos"><span class="dot"></span>POS</a>
+        <a href="#"><span class="dot"></span>Ventas</a>
+        <a href="#"><span class="dot"></span>Compras</a>
+        <a href="#"><span class="dot"></span>Clientes</a>
+        <a href="#"><span class="dot"></span>Productos</a>
+        <a href="#"><span class="dot"></span>Proveedores</a>
+        <a href="#"><span class="dot"></span>Categorías</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section id="dashboard">
+        <div class="topbar">
+          <div class="title-wrap">
+            <h1>Dashboard operativo BoskePOS</h1>
+            <p>Wireframe de referencia para un panel tecnológico, nuevo y eficiente.</p>
+          </div>
+          <div class="toolbar">
+            <div class="seg" aria-label="Rango rápido">
+              <button>Hoy</button>
+              <button class="active">7 días</button>
+              <button>30 días</button>
+            </div>
+            <input class="input" type="text" value="13-07-2026" aria-label="Desde" />
+            <input class="input" type="text" value="13-07-2026" aria-label="Hasta" />
+            <button class="btn primary">Actualizar</button>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="card hero">
+            <div class="section-title">
+              <div>
+                <div class="tag">Operativo en tiempo real</div>
+                <h2 style="margin-top:10px;">Resumen diario y lectura inmediata</h2>
+              </div>
+              <div class="tag">Caja online · Inventario sincronizado</div>
+            </div>
+            <p style="margin:0;color:var(--muted);max-width:68ch;">El objetivo del dashboard es mostrar estado, tendencia y anomalías en un solo vistazo. KPIs arriba, tendencia principal al centro y tablas operativas abajo.</p>
+          </div>
+
+          <div class="kpis">
+            <article class="card kpi">
+              <div class="meta"><span class="tag">Ventas del rango</span><span class="delta up">+8.2%</span></div>
+              <div class="value">$1.245.990</div>
+              <div style="color:var(--muted);font-size:14px;">Comparado con el período anterior</div>
+              <div class="spark" aria-hidden="true"></div>
+            </article>
+            <article class="card kpi">
+              <div class="meta"><span class="tag">Cantidad de ventas</span><span class="delta up">+12 hoy</span></div>
+              <div class="value">86</div>
+              <div style="color:var(--muted);font-size:14px;">Transacciones completadas</div>
+              <div class="spark" aria-hidden="true"></div>
+            </article>
+            <article class="card kpi">
+              <div class="meta"><span class="tag">Stock bajo</span><span class="delta warn">14 críticos</span></div>
+              <div class="value">14</div>
+              <div style="color:var(--muted);font-size:14px;">Productos bajo mínimo</div>
+              <div class="spark" aria-hidden="true"></div>
+            </article>
+            <article class="card kpi">
+              <div class="meta"><span class="tag">Sin stock</span><span class="delta down">3 urgentes</span></div>
+              <div class="value">3</div>
+              <div style="color:var(--muted);font-size:14px;">Reposición inmediata</div>
+              <div class="spark" aria-hidden="true"></div>
+            </article>
+          </div>
+
+          <section class="card main-chart">
+            <div class="section-title">
+              <div>
+                <h3>Ventas por día y pulso operativo</h3>
+                <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Chart principal del panel. Aquí vive la tendencia.</p>
+              </div>
+              <div class="tabs"><span class="active">Monto</span><span>Unidades</span><span>Tickets</span></div>
+            </div>
+            <div class="chart-area" aria-hidden="true"></div>
+          </section>
+
+          <div class="side-stack">
+            <section class="card panel">
+              <div class="section-title">
+                <div>
+                  <h3>Salud de inventario</h3>
+                  <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Resumen rápido de abastecimiento.</p>
+                </div>
+                <span class="tag">Hoy</span>
+              </div>
+              <div class="donut">
+                <div class="donut-label"><div><strong>82%</strong>Sano</div></div>
+              </div>
+              <div class="legend">
+                <div><span><i style="background:#15803d"></i>Sano</span><strong>82%</strong></div>
+                <div><span><i style="background:#f59e0b"></i>Stock bajo</span><strong>14%</strong></div>
+                <div><span><i style="background:#dc2626"></i>Sin stock</span><strong>4%</strong></div>
+              </div>
+            </section>
+
+            <section class="card panel">
+              <div class="section-title">
+                <div>
+                  <h3>Top productos</h3>
+                  <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Más vendidos por unidades.</p>
+                </div>
+                <span class="tag">7 días</span>
+              </div>
+              <div class="bars">
+                <div class="bar-row"><span>Adhesivo Sikadur 31</span><div class="bar-track"><div class="bar-fill" style="width:86%"></div></div><strong>124</strong></div>
+                <div class="bar-row"><span>Taladro Percutor 650W</span><div class="bar-track"><div class="bar-fill" style="width:74%"></div></div><strong>97</strong></div>
+                <div class="bar-row"><span>Esmeril Angular 4.5”</span><div class="bar-track"><div class="bar-fill" style="width:66%"></div></div><strong>83</strong></div>
+                <div class="bar-row"><span>Sierra Caladora 500W</span><div class="bar-track"><div class="bar-fill" style="width:48%"></div></div><strong>61</strong></div>
+              </div>
+            </section>
+          </div>
+
+          <section class="card table-card wide">
+            <div class="section-title"><h3>Ventas recientes</h3><span class="tag">Compact table</span></div>
+            <table>
+              <thead><tr><th>Venta</th><th>Cliente</th><th>Estado</th><th>Total</th><th>Hora</th></tr></thead>
+              <tbody>
+                <tr><td>#1054</td><td>Consumidor final</td><td>Completada</td><td>$54.990</td><td>16:42</td></tr>
+                <tr><td>#1053</td><td>Maestro Pérez</td><td>Completada</td><td>$219.600</td><td>16:18</td></tr>
+                <tr><td>#1052</td><td>Constructora Norte</td><td>Anulada</td><td>$28.990</td><td>15:58</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="card table-card wide">
+            <div class="section-title"><h3>Movimientos recientes</h3><span class="tag">Inventario</span></div>
+            <table>
+              <thead><tr><th>Producto</th><th>Tipo</th><th>Cantidad</th><th>Saldo</th><th>Fecha</th></tr></thead>
+              <tbody>
+                <tr><td>Adhesivo Epóxico Sikadur 31</td><td>Salida</td><td>1</td><td>9 → 8</td><td>11-07-26, 9:18 p. m.</td></tr>
+                <tr><td>Sierra Caladora 500W</td><td>Entrada</td><td>2</td><td>5 → 7</td><td>11-07-26, 9:10 p. m.</td></tr>
+                <tr><td>Taladro Percutor 650W</td><td>Entrada</td><td>2</td><td>7 → 9</td><td>11-07-26, 9:10 p. m.</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="card actions">
+            <div class="section-title"><h3>Acciones rápidas</h3><span class="tag">Reemplaza la lista larga actual</span></div>
+            <div class="quick-grid">
+              <div class="quick"><strong>Abrir POS</strong><p>Ir directo a caja y comenzar venta.</p></div>
+              <div class="quick"><strong>Productos</strong><p>Alta, edición y control de catálogo.</p></div>
+              <div class="quick"><strong>Compras</strong><p>Ingresar recepción y órdenes.</p></div>
+              <div class="quick"><strong>Ventas</strong><p>Historial, anulaciones y detalle.</p></div>
+              <div class="quick"><strong>Clientes</strong><p>Clientes frecuentes y empresas.</p></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="divider-title"><h2 id="pos">Wireframe caja POS</h2></div>
+
+      <section class="pos-shell">
+        <div class="card pos-main">
+          <div class="section-title">
+            <div>
+              <h3>Caja pensada para velocidad</h3>
+              <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">La prioridad es foco, lectura rápida y cobro en pocos pasos.</p>
+            </div>
+            <span class="tag">Teclado + lector</span>
+          </div>
+
+          <div class="status-row">
+            <div class="status-box"><small>Caja</small><strong>#03 · Turno abierto</strong></div>
+            <div class="status-box"><small>Cajero</small><strong>admin_boske</strong></div>
+            <div class="status-box"><small>Cliente</small><strong>Consumidor final</strong></div>
+            <div class="status-box"><small>Documento</small><strong>Boleta</strong></div>
+            <div class="status-box"><small>Estado</small><strong>Online · SII OK</strong></div>
+          </div>
+
+          <div class="search-hero">
+            <label>Buscar o escanear producto</label>
+            <div class="search-input">
+              <strong>Escanea código o busca por nombre / SKU</strong>
+              <span>Enter agrega si la coincidencia es exacta</span>
+            </div>
+            <div class="hint-row">
+              <span class="hint">F2 Cantidad</span>
+              <span class="hint">F3 Descuento</span>
+              <span class="hint">F4 Cliente</span>
+              <span class="hint">F6 Suspender</span>
+              <span class="hint">F7 Recuperar</span>
+            </div>
+          </div>
+
+          <div class="pos-grid">
+            <div>
+              <section class="results-card">
+                <div class="card-head">
+                  <div>
+                    <h4>Resultados / venta actual</h4>
+                    <div style="color:var(--muted);font-size:13px;margin-top:4px;">El espacio vacío se reemplaza por una tabla útil.</div>
+                  </div>
+                  <div class="tabs"><span class="active">Resultados</span><span>Venta</span><span>Sugeridos</span></div>
+                </div>
+                <div class="card-body">
+                  <div class="result-row">
+                    <div><strong>Adhesivo Epóxico Sikadur 31</strong><small>SKU FIQ-SIK-002 · Pasillo B2</small></div>
+                    <div class="stock">Stock 9</div>
+                    <div><strong>$28.990</strong></div>
+                    <button class="add-btn">Agregar</button>
+                  </div>
+                  <div class="result-row">
+                    <div><strong>Taladro Percutor 650W</strong><small>SKU HE001 · Herramientas</small></div>
+                    <div class="stock">Stock 7</div>
+                    <div><strong>$89.990</strong></div>
+                    <button class="add-btn">Agregar</button>
+                  </div>
+                  <div class="result-row">
+                    <div><strong>Esmeril Angular 4.5”</strong><small>SKU HE002 · Corte y desbaste</small></div>
+                    <div class="stock">Stock 5</div>
+                    <div><strong>$42.500</strong></div>
+                    <button class="add-btn">Agregar</button>
+                  </div>
+                  <div class="result-row">
+                    <div><strong>Disco corte metal</strong><small>SKU DCM-010 · Consumibles</small></div>
+                    <div class="stock">Stock 31</div>
+                    <div><strong>$2.950</strong></div>
+                    <button class="add-btn">Agregar</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="shortcut-card">
+                <div class="card-head"><h4>Acciones rápidas</h4><span class="tag">Visibles y memorables</span></div>
+                <div class="card-body shortcut-grid">
+                  <div class="shortcut"><strong>F2</strong><small>Cantidad</small></div>
+                  <div class="shortcut"><strong>F3</strong><small>Descuento</small></div>
+                  <div class="shortcut"><strong>F4</strong><small>Cliente</small></div>
+                  <div class="shortcut"><strong>F6</strong><small>Suspender</small></div>
+                  <div class="shortcut"><strong>F7</strong><small>Recuperar</small></div>
+                  <div class="shortcut"><strong>F9</strong><small>Eliminar línea</small></div>
+                </div>
+              </section>
+            </div>
+
+            <div>
+              <section class="cart-card">
+                <div class="card-head">
+                  <div>
+                    <h4>Carrito / cobro</h4>
+                    <div style="color:var(--muted);font-size:13px;margin-top:4px;">Sticky visual del cierre de venta.</div>
+                  </div>
+                  <button class="btn ghost" style="min-height:38px;">Limpiar</button>
+                </div>
+                <div class="card-body">
+                  <article class="cart-item">
+                    <div class="cart-top">
+                      <div><strong>Adhesivo Epóxico Sikadur 31</strong><div style="color:var(--muted);font-size:12px;margin-top:4px;">SKU FIQ-SIK-002 · Stock 9</div></div>
+                      <strong>$28.990</strong>
+                    </div>
+                    <div class="cart-qty">
+                      <div class="qty-step"><span>−</span><strong>1</strong><span>+</span></div>
+                      <div style="color:var(--muted);font-size:13px;">1 x $28.990</div>
+                    </div>
+                  </article>
+                  <article class="cart-item">
+                    <div class="cart-top">
+                      <div><strong>Disco corte metal</strong><div style="color:var(--muted);font-size:12px;margin-top:4px;">SKU DCM-010 · Stock 31</div></div>
+                      <strong>$5.900</strong>
+                    </div>
+                    <div class="cart-qty">
+                      <div class="qty-step"><span>−</span><strong>2</strong><span>+</span></div>
+                      <div style="color:var(--muted);font-size:13px;">2 x $2.950</div>
+                    </div>
+                  </article>
+                </div>
+                <div class="totals">
+                  <div class="line"><span>Subtotal</span><strong>$34.890</strong></div>
+                  <div class="line"><span>Descuento</span><strong>$0</strong></div>
+                  <div class="line"><span>IVA</span><strong>Incluido</strong></div>
+                  <div class="grand"><strong>Total</strong><strong>$34.890</strong></div>
+                  <div class="pay-grid">
+                    <div class="pay-pill active">Débito</div>
+                    <div class="pay-pill">Efectivo</div>
+                    <div class="pay-pill">Transferencia</div>
+                    <div class="pay-pill">Mixto</div>
+                  </div>
+                  <button class="btn primary" style="width:100%;min-height:52px;font-size:16px;">Cobrar</button>
+                </div>
+              </section>
+
+              <section class="payment-card" style="margin-top:16px; padding:16px;">
+                <div class="section-title" style="margin-bottom:12px;">
+                  <h4>Notas del rediseño</h4>
+                  <span class="tag">Clave</span>
+                </div>
+                <ul style="margin:0;padding-left:18px;color:var(--muted);font-size:14px;display:grid;gap:8px;">
+                  <li>El input principal domina la pantalla.</li>
+                  <li>Resultados y venta viven en la misma zona útil.</li>
+                  <li>El carrito se siente como un panel de cierre, no un sidebar accesorio.</li>
+                  <li>Los métodos de pago aparecen antes del CTA final.</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <aside class="card pos-side" aria-label="Guía de construcción">
+          <div class="section-title">
+            <div>
+              <h3>Guía rápida</h3>
+              <p style="margin:6px 0 0;color:var(--muted);font-size:14px;">Qué debes trasladar a tu UI real.</p>
+            </div>
+            <span class="tag">Bklit UI style</span>
+          </div>
+          <div style="display:grid;gap:14px;">
+            <div class="status-box"><small>Dashboard</small><strong>KPIs arriba, chart central, tablas abajo.</strong></div>
+            <div class="status-box"><small>Charts</small><strong>Sparklines, línea principal, donut pequeño, barras top productos.</strong></div>
+            <div class="status-box"><small>Caja</small><strong>Más tabla útil, menos espacios vacíos, total sticky.</strong></div>
+            <div class="status-box"><small>Motion</small><strong>Count-up, reveal corto y feedback al agregar producto.</strong></div>
+            <div class="status-box"><small>Evitar</small><strong>Glow, charts decorativos y exceso de colores.</strong></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

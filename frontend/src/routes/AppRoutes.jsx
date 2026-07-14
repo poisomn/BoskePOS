@@ -1,10 +1,10 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
 import AccessDeniedPage from '../pages/Auth/AccessDeniedPage'
 import CustomersPage from '../pages/Customers/CustomersPage'
-import DashboardPage from '../pages/Dashboard/DashboardPage'
 import CategoriesPage from '../pages/Inventory/CategoriesPage'
 import ProductsPage from '../pages/Inventory/ProductsPage'
 import LoginPage from '../pages/Login/LoginPage'
@@ -17,16 +17,39 @@ import SuppliersPage from '../pages/Suppliers/SuppliersPage'
 import ProtectedRoute from './ProtectedRoute'
 import RequirePermission from './RequirePermission'
 
+const BklitSmokeTestPage = import.meta.env.DEV
+  ? lazy(() => import('../pages/Dev/BklitSmokeTestPage'))
+  : null
+const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'))
+const routeFallback = <div className="surface p-5">Cargando modulo...</div>
+
 function AppRoutes() {
   return (
     <Routes>
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
+      {BklitSmokeTestPage ? (
+        <Route
+          path="/dev/bklit-smoke"
+          element={(
+            <Suspense fallback={routeFallback}>
+              <BklitSmokeTestPage />
+            </Suspense>
+          )}
+        />
+      ) : null}
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
+          <Route
+            index
+            element={(
+              <Suspense fallback={routeFallback}>
+                <DashboardPage />
+              </Suspense>
+            )}
+          />
           <Route path="/access-denied" element={<AccessDeniedPage />} />
 
           <Route element={<RequirePermission permissions={['sales:complete']} />}>

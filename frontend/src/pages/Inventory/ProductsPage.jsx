@@ -525,7 +525,8 @@ function ProductsPage() {
             ) : null}
             {barcodeError ? <div className="alert alert-warning mt-3">{barcodeError}</div> : null}
             {barcodeResult ? (
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_120px]">
+                <div className="space-y-2">
                 <div>
                   <p className="font-semibold">{barcodeResult.name}</p>
                   <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
@@ -543,7 +544,9 @@ function ProductsPage() {
                     {barcodeResult.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </div>
-                <p className="text-lg font-semibold">{formatMoney(barcodeResult.sale_price)}</p>
+                  <p className="text-lg font-semibold">{formatMoney(barcodeResult.sale_price)}</p>
+                </div>
+                <ProductImagePreview product={barcodeResult} />
               </div>
             ) : null}
             {!isBarcodeLoading && !barcodeError && !barcodeResult ? (
@@ -851,6 +854,32 @@ function FieldError({ message }) {
     <p className="mt-1 text-sm" style={{ color: 'var(--color-error)' }}>
       {message}
     </p>
+  )
+}
+
+function ProductImagePreview({ product }) {
+  if (product.image) {
+    return (
+      <img
+        alt={`Imagen de ${product.name}`}
+        className="aspect-square w-full rounded-lg border object-cover"
+        src={product.image}
+        style={{ borderColor: 'var(--color-border)' }}
+      />
+    )
+  }
+
+  return (
+    <div
+      className="grid aspect-square w-full place-items-center rounded-lg border text-lg font-semibold"
+      style={{
+        background: 'var(--color-steel-50)',
+        borderColor: 'var(--color-border)',
+        color: 'var(--color-steel-600)',
+      }}
+    >
+      {getProductInitials(product.name)}
+    </div>
   )
 }
 
