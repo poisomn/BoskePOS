@@ -243,8 +243,7 @@ class DashboardSummaryView(APIView):
         stock_counts = active_products.aggregate(
             active_count=Count('id'),
             out_of_stock_count=Count('id', filter=Q(stock=0)),
-            low_stock_count=Count('id', filter=Q(stock__lte=F('minimum_stock'))),
-            alert_stock_count=Count(
+            low_stock_count=Count(
                 'id',
                 filter=Q(stock__gt=0, stock__lte=F('minimum_stock')),
             ),
@@ -255,7 +254,7 @@ class DashboardSummaryView(APIView):
         )
         low_stock_products = (
             active_products
-            .filter(stock__lte=F('minimum_stock'))
+            .filter(stock__gt=0, stock__lte=F('minimum_stock'))
             .order_by('stock', 'name')[:DEFAULT_RECENT_LIMIT]
         )
         out_of_stock_products = (
@@ -268,7 +267,7 @@ class DashboardSummaryView(APIView):
             'active_count': stock_counts['active_count'],
             'healthy_stock_count': stock_counts['healthy_stock_count'],
             'low_stock_count': stock_counts['low_stock_count'],
-            'alert_stock_count': stock_counts['alert_stock_count'],
+            'alert_stock_count': stock_counts['low_stock_count'],
             'out_of_stock_count': stock_counts['out_of_stock_count'],
             'low_stock_products': [
                 serialize_product_stock(product)

@@ -40,7 +40,9 @@ Conteo de ventas con estado `completed` dentro del rango solicitado.
 
 Productos activos donde:
 
-`stock <= minimum_stock`
+`stock > 0 AND stock <= minimum_stock`
+
+Los productos con stock `0` se informan exclusivamente en "Sin stock" para evitar duplicidad visual y operacional.
 
 ### Sin stock
 

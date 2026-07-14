@@ -124,14 +124,14 @@ class DashboardSummaryApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['inventory']['active_count'], 3)
         self.assertEqual(response.data['inventory']['healthy_stock_count'], 1)
-        self.assertEqual(response.data['inventory']['low_stock_count'], 2)
+        self.assertEqual(response.data['inventory']['low_stock_count'], 1)
         self.assertEqual(response.data['inventory']['alert_stock_count'], 1)
         self.assertEqual(response.data['inventory']['out_of_stock_count'], 1)
         low_stock_skus = {
             product['sku'] for product in response.data['inventory']['low_stock_products']
         }
         self.assertIn(self.low_stock_product.sku, low_stock_skus)
-        self.assertIn(self.out_of_stock_product.sku, low_stock_skus)
+        self.assertNotIn(self.out_of_stock_product.sku, low_stock_skus)
 
     def test_summary_includes_recent_purchases_and_stock_movements(self):
         purchase = Purchase.objects.create(
