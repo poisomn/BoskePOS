@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-
 import { useAuth } from '../../hooks/useAuth'
 import LoginForm from './LoginForm'
 
@@ -17,7 +16,6 @@ function LoginPage() {
 
   async function handleLogin(credentials) {
     setError('')
-
     try {
       await login(credentials)
       navigate(redirectTo, { replace: true })
@@ -25,35 +23,37 @@ function LoginPage() {
       const status = loginError.response?.status
       setError(
         status === 401
-          ? 'Correo o contrasena incorrectos.'
-          : 'No se pudo iniciar sesion. Intenta nuevamente.',
+          ? 'Correo o contraseña incorrectos.'
+          : 'No se pudo iniciar sesión. Intenta nuevamente.'
       )
     }
   }
 
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-8 text-center lg:hidden">
+    <div className="mx-auto w-full max-w-sm lg:w-96">
+      
+      {/* Logo visible solo en móviles */}
+      <div className="flex items-center gap-2 mb-10 lg:hidden justify-center">
         <img
           src="/brand/LogoBoskePOS.webp"
           alt="BoskePOS"
-          className="mx-auto h-24 w-auto object-contain"
+          className="h-16 w-auto object-contain"
         />
       </div>
 
-      <section className="surface p-6">
-        <div className="mb-6">
-          <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
-            Acceso seguro
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold">Iniciar sesion</h1>
-          <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Usa las credenciales creadas en el backend para entrar al sistema.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold leading-9 tracking-tight text-gray-900">
+          Iniciar sesión
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-gray-500">
+          Usa las credenciales del sistema para acceder a la caja.
+        </p>
+      </div>
 
+      <div className="mt-10">
         <LoginForm error={error} isSubmitting={isSubmitting} onSubmit={handleLogin} />
-      </section>
+      </div>
+      
     </div>
   )
 }

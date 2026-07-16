@@ -90,7 +90,7 @@ if DB_ENGINE == 'postgresql':
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': config('POSTGRES_DB', default='boskepos_db'),
             'USER': config('POSTGRES_USER', default='boskepos_user'),
-            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='Admin.001.ferre'),
             'HOST': config('POSTGRES_HOST', default='localhost'),
             'PORT': config('POSTGRES_PORT', default='5432'),
         }
