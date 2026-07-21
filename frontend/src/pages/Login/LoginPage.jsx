@@ -45,9 +45,6 @@ function LoginPage() {
         <h2 className="text-3xl font-bold leading-9 tracking-tight text-gray-900">
           Iniciar sesión
         </h2>
-        <p className="mt-2 text-sm leading-6 text-gray-500">
-          Usa las credenciales del sistema para acceder a la caja.
-        </p>
       </div>
 
       <div className="mt-10">

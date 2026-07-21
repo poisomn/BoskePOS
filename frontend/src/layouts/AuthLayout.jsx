@@ -10,13 +10,12 @@ function AuthLayout() {
         <div className="absolute -bottom-40 -right-32 h-[40rem] w-[40rem] rounded-full bg-[#F59E0B] opacity-10"></div>
         
         <div className="absolute inset-0 flex flex-col justify-between p-12 z-10">
-          {/* CORRECCIÓN: Fondo blanco sutil para respetar los colores originales de tu logo */}
           <div>
             <div className="bg-white px-5 py-3 rounded-2xl inline-block shadow-md">
               <img
                 src="/brand/LogoBoskePOS.webp"
                 alt="BoskePOS"
-                className="h-12 w-auto object-contain"
+                className="h-25 w-auto object-contain"
               />
             </div>
           </div>
@@ -26,14 +25,17 @@ function AuthLayout() {
             <p className="text-sm font-semibold uppercase tracking-wide text-[#F59E0B] mb-3">
               ERP/POS Comercial
             </p>
-            <h1 className="text-4xl font-bold text-white tracking-tight leading-tight">
-              Operación rápida para ferreterías chilenas.
+            <h1 className="text-6xl font-bold text-white tracking-tight leading-tight">
+              BoskePOS
+            </h1>
+
+            <h1 className="text-3xl font-bold text-white tracking-tight leading-tight">
+              Soluciones informáticas para tu negocio.
             </h1>
             <p className="mt-4 text-lg text-gray-400">
-              Acceso seguro para cajeros y vendedores. La interfaz está preparada para trabajar con extrema rapidez desde el mesón.
+              Acceso seguro para usuarios del sistema. Interfaz rápida, versátil y sólida para todas sus necesidades.
             </p>
           </div>
-
           <div className="text-sm text-gray-500">
             BoskePOS v0.1
           </div>
