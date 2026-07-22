@@ -111,11 +111,14 @@ def confirm_purchase(*, purchase, user):
     _recalculate_persisted_purchase(purchase, items)
 
     for item in items:
-        if not item.product.is_active:
+        product = Product.objects.select_for_update().get(pk=item.product_id)
+
+        if not product.is_active:
             raise ValidationError({'items': f'El producto {item.product_sku} no esta activo.'})
 
+        _update_weighted_average_cost(product=product, item=item)
         apply_stock_movement(
-            product=item.product,
+            product=product,
             movement_type=StockMovement.MovementType.ENTRY,
             quantity=item.quantity,
             reason=f'Compra #{purchase.id} confirmada',
@@ -217,3 +220,22 @@ def _recalculate_persisted_purchase(purchase, items):
 
     purchase.subtotal = total.quantize(Decimal('0.01'))
     purchase.total = total.quantize(Decimal('0.01'))
+
+
+def _update_weighted_average_cost(*, product, item):
+    current_stock = Decimal(product.stock)
+    incoming_quantity = Decimal(item.quantity)
+
+    if incoming_quantity <= 0:
+        return
+
+    if current_stock <= 0:
+        product.cost_price = item.unit_cost.quantize(Decimal('0.01'))
+    else:
+        current_value = product.cost_price * current_stock
+        incoming_value = item.unit_cost * incoming_quantity
+        product.cost_price = (
+            (current_value + incoming_value) / (current_stock + incoming_quantity)
+        ).quantize(Decimal('0.01'))
+
+    product.save(update_fields=('cost_price', 'updated_at'))

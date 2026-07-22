@@ -60,6 +60,8 @@ function ProductsPage() {
   const [isMovementsLoading, setIsMovementsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [movementError, setMovementError] = useState('')
+  const [movementDateFrom, setMovementDateFrom] = useState('')
+  const [movementDateTo, setMovementDateTo] = useState('')
   const [movementPage, setMovementPage] = useState(1)
   const [movementSearch, setMovementSearch] = useState('')
   const [movementTypeFilter, setMovementTypeFilter] = useState('')
@@ -105,6 +107,8 @@ function ProductsPage() {
 
     try {
       const data = await listStockMovementsPage({
+        dateFrom: movementDateFrom,
+        dateTo: movementDateTo,
         movementType: movementTypeFilter,
         page: movementPage,
         pageSize: MOVEMENT_PAGE_SIZE,
@@ -117,7 +121,7 @@ function ProductsPage() {
     } finally {
       setIsMovementsLoading(false)
     }
-  }, [movementPage, movementSearch, movementTypeFilter])
+  }, [movementDateFrom, movementDateTo, movementPage, movementSearch, movementTypeFilter])
 
   useEffect(() => {
     queueMicrotask(fetchProducts)
@@ -190,6 +194,16 @@ function ProductsPage() {
 
   function handleMovementTypeFilterChange(value) {
     setMovementTypeFilter(value)
+    setMovementPage(1)
+  }
+
+  function handleMovementDateFromChange(value) {
+    setMovementDateFrom(value)
+    setMovementPage(1)
+  }
+
+  function handleMovementDateToChange(value) {
+    setMovementDateTo(value)
     setMovementPage(1)
   }
 
@@ -718,10 +732,10 @@ function ProductsPage() {
       <section className="surface space-y-4 p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="section-title">Historial de movimientos</h2>
-            <p className="section-note">Cada ajuste manual queda registrado con usuario, fecha y saldo.</p>
+            <h2 className="section-title">Kardex de inventario</h2>
+            <p className="section-note">Entradas, salidas, ajustes, compras y ventas con usuario, referencia y saldo.</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <label>
               <span className="field-label">Buscar</span>
               <input
@@ -745,6 +759,24 @@ function ProductsPage() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              <span className="field-label">Desde</span>
+              <input
+                className="input"
+                onChange={(event) => handleMovementDateFromChange(event.target.value)}
+                type="date"
+                value={movementDateFrom}
+              />
+            </label>
+            <label>
+              <span className="field-label">Hasta</span>
+              <input
+                className="input"
+                onChange={(event) => handleMovementDateToChange(event.target.value)}
+                type="date"
+                value={movementDateTo}
+              />
             </label>
           </div>
         </div>
@@ -790,6 +822,11 @@ const movementColumns = [
   },
   { key: 'quantity', header: 'Cantidad' },
   { key: 'reason', header: 'Motivo' },
+  {
+    key: 'reference',
+    header: 'Referencia',
+    render: (movement) => movement.reference || '-',
+  },
   {
     key: 'user',
     header: 'Usuario',

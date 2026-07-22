@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiCheckCircle, FiFileText, FiXCircle } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckCircle, FiFileText, FiPrinter, FiXCircle } from 'react-icons/fi'
 
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useAuth } from '../../hooks/useAuth'
 import { cancelSale, getSale } from '../../services/salesService'
+import { getBusinessSettings } from '../../services/settingsService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
 
@@ -17,6 +18,7 @@ function SaleDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sale, setSale] = useState(null)
+  const [settings, setSettings] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const saleRegistered = Boolean(location.state?.saleRegistered)
 
@@ -25,8 +27,12 @@ function SaleDetailPage() {
     setError('')
 
     try {
-      const data = await getSale(saleId)
-      setSale(data)
+      const [saleData, settingsData] = await Promise.all([
+        getSale(saleId),
+        getBusinessSettings().catch(() => null),
+      ])
+      setSale(saleData)
+      setSettings(settingsData)
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'No se pudo cargar el comprobante.'))
     } finally {
@@ -99,16 +105,25 @@ function SaleDetailPage() {
             </div>
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
-                Comprobante
+                {settings?.business_name || 'BoskePOS'}
               </p>
               <h1 className="mt-1 text-2xl font-semibold">Venta #{sale.id}</h1>
               <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 {formatDateTime(sale.created_at)}
               </p>
+              {settings?.rut || settings?.address ? (
+                <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  {[settings.rut, settings.address, settings.city].filter(Boolean).join(' - ')}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="flex gap-2">
+            <button className="btn btn-secondary" onClick={() => window.print()} type="button">
+              <FiPrinter aria-hidden="true" />
+              Imprimir
+            </button>
             {sale.status === 'completed' && hasPermission('sales:cancel') ? (
               <button className="btn btn-danger" onClick={() => setIsCancelOpen(true)} type="button">
                 <FiXCircle aria-hidden="true" />
@@ -132,18 +147,32 @@ function SaleDetailPage() {
                 <th>Producto</th>
                 <th>Cantidad</th>
                 <th>Precio</th>
+                <th>Descuento</th>
+                <th>IVA</th>
                 <th>Total linea</th>
               </tr>
             </thead>
             <tbody>
               {sale.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="font-medium">{item.product_sku}</td>
-                  <td>{item.product_name}</td>
-                  <td>{item.quantity}</td>
-                  <td>{formatMoney(item.unit_price)}</td>
-                  <td><strong>{formatMoney(item.line_total)}</strong></td>
-                </tr>
+                <Fragment key={item.id}>
+                  <tr>
+                    <td className="font-medium">{item.product_sku}</td>
+                    <td>{item.product_name}</td>
+                    <td>{item.quantity}</td>
+                    <td>{formatMoney(item.unit_price)}</td>
+                    <td>{formatMoney(item.discount_total)}</td>
+                    <td>{formatMoney(item.tax_total)}</td>
+                    <td><strong>{formatMoney(item.line_total)}</strong></td>
+                  </tr>
+                  {item.note ? (
+                    <tr>
+                      <td />
+                      <td colSpan={6} className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                        Observacion: {item.note}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -157,16 +186,44 @@ function SaleDetailPage() {
               <strong>{sale.customer_name || 'Consumidor final'}</strong>
             </div>
             <div className="flex justify-between">
-              <span style={{ color: 'var(--color-text-muted)' }}>Vendedor</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>Cajero</span>
               <strong>{sale.user_email}</strong>
             </div>
             <div className="flex justify-between">
               <span style={{ color: 'var(--color-text-muted)' }}>Estado</span>
               <StatusBadge status={sale.status} label={sale.status_label} />
             </div>
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--color-text-muted)' }}>Pago</span>
+              <strong>{sale.payment_method_label || '-'}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--color-text-muted)' }}>Recibido</span>
+              <strong>{formatMoney(sale.amount_paid)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--color-text-muted)' }}>Vuelto</span>
+              <strong>{formatMoney(sale.change_amount)}</strong>
+            </div>
+            {sale.notes ? (
+              <div className="rounded-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
+                <p className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                  Observacion
+                </p>
+                <p className="mt-1">{sale.notes}</p>
+              </div>
+            ) : null}
             <div className="flex justify-between border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
               <span>Subtotal</span>
               <strong>{formatMoney(sale.subtotal)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span>Descuentos</span>
+              <strong>{formatMoney(sale.discount_total)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span>IVA incluido</span>
+              <strong>{formatMoney(sale.tax_total)}</strong>
             </div>
             <div className="flex items-center justify-between border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
               <span className="text-lg font-semibold">Total</span>
@@ -174,6 +231,11 @@ function SaleDetailPage() {
                 {formatMoney(sale.total)}
               </strong>
             </div>
+            {settings?.ticket_footer ? (
+              <p className="border-t pt-3 text-center text-xs" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+                {settings.ticket_footer}
+              </p>
+            ) : null}
           </div>
         </aside>
       </section>

@@ -15,20 +15,37 @@ class SaleItemInline(admin.TabularInline):
         'discount_total',
         'tax_total',
         'line_total',
+        'note',
     )
     can_delete = False
 
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer', 'user', 'status', 'total', 'created_at')
-    list_filter = ('status', 'created_at', 'completed_at', 'cancelled_at')
+    list_display = (
+        'id',
+        'customer',
+        'user',
+        'status',
+        'payment_method',
+        'total',
+        'created_at',
+    )
+    list_filter = (
+        'status',
+        'payment_method',
+        'created_at',
+        'completed_at',
+        'cancelled_at',
+    )
     search_fields = ('id', 'customer__name', 'customer__rut', 'user__email')
     readonly_fields = (
         'subtotal',
         'discount_total',
         'tax_total',
         'total',
+        'amount_paid',
+        'change_amount',
         'completed_at',
         'cancelled_at',
         'created_at',

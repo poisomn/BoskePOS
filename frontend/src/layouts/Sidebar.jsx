@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { FiBarChart2, FiGrid, FiHome, FiPackage, FiShoppingBag, FiShoppingCart, FiTruck, FiUsers } from 'react-icons/fi'
+import { FiBarChart2, FiGrid, FiHome, FiPackage, FiSettings, FiShoppingBag, FiShoppingCart, FiTruck, FiUsers } from 'react-icons/fi'
 
 import { useAuth } from '../hooks/useAuth'
 import { hasAnyPermission } from '../utils/permissions'
@@ -13,6 +13,7 @@ const navItems = [
   { icon: FiTruck, label: 'Proveedores', permissions: ['suppliers:read'], to: '/suppliers' },
   { icon: FiPackage, label: 'Productos', permissions: ['inventory:read'], to: '/inventory/products' },
   { icon: FiGrid, label: 'Categorias', permissions: ['inventory:read'], to: '/inventory/categories' },
+  { icon: FiSettings, label: 'Configuracion', permissions: ['settings:read'], to: '/settings/business' },
 ]
 
 function Sidebar() {

@@ -33,6 +33,8 @@ ROLE_PERMISSIONS = {
         'sales:complete',
         'sales:cancel',
         'reports:sensitive',
+        'settings:read',
+        'settings:write',
     }),
     SELLER_ROLE: frozenset({
         'inventory:read',
@@ -253,4 +255,27 @@ class SalePermission(ActionPermission):
         'partial_update': 'sales:write',
         'complete': 'sales:complete',
         'cancel': 'sales:cancel',
+        'discard': 'sales:write',
     }
+
+
+class SystemSettingsPermission(ActionPermission):
+    read_permission = 'settings:read'
+
+    action_permissions = {
+        'business_settings': 'settings:read',
+    }
+
+    def has_permission(self, request, view) -> bool:
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        if request.method in {'GET', 'HEAD', 'OPTIONS'}:
+            return has_app_permission(user, 'settings:read')
+
+        return has_app_permission(user, 'settings:write')

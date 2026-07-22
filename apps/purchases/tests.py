@@ -58,6 +58,7 @@ class PurchasesApiTests(APITestCase):
         self.assertEqual(response.data['status'], Purchase.Status.CONFIRMED)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.product.cost_price, Decimal('1000.00'))
         self.assertEqual(
             StockMovement.objects.filter(
                 product=self.product,
@@ -71,6 +72,29 @@ class PurchasesApiTests(APITestCase):
         self.assertEqual(second_response.status_code, status.HTTP_409_CONFLICT)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 8)
+
+    def test_confirm_purchase_updates_weighted_average_cost(self):
+        purchase_id = self._create_purchase_id(unit_cost='1600.00', quantity=5)
+
+        response = self.client.post(reverse('purchases:purchase-confirm', args=[purchase_id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 10)
+        self.assertEqual(self.product.cost_price, Decimal('1300.00'))
+
+    def test_confirm_purchase_uses_unit_cost_when_stock_is_zero(self):
+        self.product.stock = 0
+        self.product.cost_price = Decimal('1000.00')
+        self.product.save(update_fields=('stock', 'cost_price'))
+        purchase_id = self._create_purchase_id(unit_cost='1750.00', quantity=2)
+
+        response = self.client.post(reverse('purchases:purchase-confirm', args=[purchase_id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 2)
+        self.assertEqual(self.product.cost_price, Decimal('1750.00'))
 
     def test_cancel_confirmed_purchase_compensates_stock(self):
         purchase_id = self._create_purchase_id(quantity=2)

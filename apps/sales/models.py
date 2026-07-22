@@ -7,6 +7,12 @@ class Sale(models.Model):
         COMPLETED = 'completed', 'Completada'
         CANCELLED = 'cancelled', 'Anulada'
 
+    class PaymentMethod(models.TextChoices):
+        CASH = 'cash', 'Efectivo'
+        DEBIT = 'debit', 'Debito'
+        CREDIT = 'credit', 'Credito'
+        TRANSFER = 'transfer', 'Transferencia'
+
     customer = models.ForeignKey(
         'customers.Customer',
         related_name='sales',
@@ -28,6 +34,14 @@ class Sale(models.Model):
     discount_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CASH,
+    )
+    amount_paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    change_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    notes = models.TextField(blank=True, default='')
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -53,6 +67,7 @@ class SaleItem(models.Model):
     discount_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2)
+    note = models.TextField(blank=True, default='')
 
     class Meta:
         ordering = ('id',)

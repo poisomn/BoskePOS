@@ -77,9 +77,11 @@ class PosApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['subtotal'], '9970.00')
+        self.assertEqual(response.data['tax_total'], '1591.85')
         self.assertEqual(response.data['total'], '9970.00')
         self.assertEqual(len(response.data['items']), 2)
         self.assertEqual(response.data['items'][0]['line_subtotal'], '7980.00')
+        self.assertEqual(response.data['items'][0]['tax_total'], '1274.12')
         self.hammer.refresh_from_db()
         self.assertEqual(self.hammer.stock, 10)
 
@@ -101,20 +103,32 @@ class PosApiTests(APITestCase):
         self.assertEqual(empty_cart_response.data['items'], [])
         self.assertEqual(empty_cart_response.data['total'], '0.00')
 
-    def test_cart_quote_rejects_duplicate_products(self):
+    def test_cart_quote_supports_duplicate_product_lines_with_aggregate_stock(self):
         response = self.client.post(
             reverse('sales:pos-cart-quote'),
             {
                 'items': [
-                    {'product_id': self.hammer.id, 'quantity': 1},
-                    {'product_id': self.hammer.id, 'quantity': 2},
+                    {'line_id': 'a', 'product_id': self.hammer.id, 'quantity': 1},
+                    {
+                        'line_id': 'b',
+                        'product_id': self.hammer.id,
+                        'quantity': 2,
+                        'discount_amount': '500.00',
+                        'note': 'Promocion meson',
+                    },
                 ]
             },
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('items', response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['items']), 2)
+        self.assertEqual(response.data['subtotal'], '11970.00')
+        self.assertEqual(response.data['discount_total'], '500.00')
+        self.assertEqual(response.data['tax_total'], '1831.35')
+        self.assertEqual(response.data['total'], '11470.00')
+        self.assertEqual(response.data['items'][1]['line_id'], 'b')
+        self.assertEqual(response.data['items'][1]['note'], 'Promocion meson')
 
     def test_cart_quote_rejects_insufficient_stock(self):
         response = self.client.post(
@@ -194,20 +208,136 @@ class PosApiTests(APITestCase):
         self.assertEqual(self.hammer.stock, 10)
         self.assertEqual(self.screwdriver.stock, 5)
 
-    def test_register_sale_rejects_duplicate_products(self):
+    def test_register_sale_supports_discount_payment_and_notes(self):
         response = self.client.post(
             reverse('sales:sale-list'),
             {
+                'payment_method': Sale.PaymentMethod.CASH,
+                'amount_paid': '10000.00',
+                'notes': 'Venta con descuento autorizado',
                 'items': [
-                    {'product_id': self.hammer.id, 'quantity': 1},
-                    {'product_id': self.hammer.id, 'quantity': 1},
+                    {
+                        'product_id': self.hammer.id,
+                        'quantity': 2,
+                        'discount_amount': '980.00',
+                        'note': 'Descuento meson',
+                    },
                 ],
             },
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(Sale.objects.count(), 0)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['subtotal'], '7980.00')
+        self.assertEqual(response.data['discount_total'], '980.00')
+        self.assertEqual(response.data['tax_total'], '1117.65')
+        self.assertEqual(response.data['total'], '7000.00')
+        self.assertEqual(response.data['amount_paid'], '10000.00')
+        self.assertEqual(response.data['change_amount'], '3000.00')
+        self.assertEqual(response.data['notes'], 'Venta con descuento autorizado')
+        self.assertEqual(response.data['items'][0]['note'], 'Descuento meson')
+
+    def test_pending_sale_does_not_discount_stock_until_completed(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'status': Sale.Status.PENDING,
+                'items': [{'product_id': self.hammer.id, 'quantity': 2}],
+            },
+            format='json',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data['status'], Sale.Status.PENDING)
+        self.hammer.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 10)
+        self.assertFalse(
+            StockMovement.objects.filter(reference=f'sale:{create_response.data["id"]}').exists()
+        )
+
+        complete_response = self.client.post(
+            reverse('sales:sale-complete', args=[create_response.data['id']]),
+            {'payment_method': Sale.PaymentMethod.DEBIT},
+            format='json',
+        )
+
+        self.assertEqual(complete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(complete_response.data['status'], Sale.Status.COMPLETED)
+        self.hammer.refresh_from_db()
+        self.assertEqual(self.hammer.stock, 8)
+
+    def test_pending_sale_completion_validates_aggregate_stock_for_duplicate_lines(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'status': Sale.Status.PENDING,
+                'items': [
+                    {'product_id': self.screwdriver.id, 'quantity': 2},
+                    {'product_id': self.screwdriver.id, 'quantity': 2},
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.screwdriver.stock = 3
+        self.screwdriver.save(update_fields=('stock',))
+
+        complete_response = self.client.post(
+            reverse('sales:sale-complete', args=[create_response.data['id']]),
+            {'payment_method': Sale.PaymentMethod.DEBIT},
+            format='json',
+        )
+
+        self.assertEqual(complete_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('items', complete_response.data)
+
+    def test_pending_sale_can_be_updated_and_discarded(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {
+                'status': Sale.Status.PENDING,
+                'items': [{'product_id': self.hammer.id, 'quantity': 1}],
+            },
+            format='json',
+        )
+        sale_id = create_response.data['id']
+
+        update_response = self.client.patch(
+            reverse('sales:sale-detail', args=[sale_id]),
+            {
+                'items': [
+                    {
+                        'product_id': self.screwdriver.id,
+                        'quantity': 2,
+                        'discount_amount': '100.00',
+                        'note': 'Linea actualizada',
+                    },
+                ],
+                'notes': 'Venta suspendida',
+            },
+            format='json',
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data['total'], '3880.00')
+        self.assertEqual(update_response.data['items'][0]['note'], 'Linea actualizada')
+
+        discard_response = self.client.post(reverse('sales:sale-discard', args=[sale_id]))
+
+        self.assertEqual(discard_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Sale.objects.filter(id=sale_id).exists())
+
+    def test_completed_sale_cannot_be_discarded(self):
+        create_response = self.client.post(
+            reverse('sales:sale-list'),
+            {'items': [{'product_id': self.hammer.id, 'quantity': 1}]},
+            format='json',
+        )
+
+        response = self.client.post(reverse('sales:sale-discard', args=[create_response.data['id']]))
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
     def test_cancel_completed_sale_restores_stock_with_auditable_movements(self):
         create_response = self.client.post(

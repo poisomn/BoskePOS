@@ -1,17 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { FiSearch } from 'react-icons/fi'
 
-function BarcodeInput({
+const BarcodeInput = forwardRef(function BarcodeInput({
   autoFocus = false,
   disabled = false,
   isLoading = false,
   label = 'Codigo de barras',
   onSubmit,
   placeholder = 'Escanea o escribe el codigo',
-}) {
+}, ref) {
   const inputRef = useRef(null)
   const lastSubmittedRef = useRef('')
   const [value, setValue] = useState('')
+
+  useImperativeHandle(ref, () => ({
+    focus() {
+      inputRef.current?.focus()
+    },
+  }))
 
   useEffect(() => {
     if (autoFocus && !disabled) {
@@ -89,6 +95,6 @@ function BarcodeInput({
       </div>
     </div>
   )
-}
+})
 
 export default BarcodeInput

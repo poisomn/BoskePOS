@@ -14,6 +14,7 @@ import PurchasesPage from '../pages/Purchases/PurchasesPage'
 import SaleDetailPage from '../pages/Sales/SaleDetailPage'
 import SalesHistoryPage from '../pages/Sales/SalesHistoryPage'
 import SuppliersPage from '../pages/Suppliers/SuppliersPage'
+import BusinessSettingsPage from '../pages/Settings/BusinessSettingsPage'
 import ProtectedRoute from './ProtectedRoute'
 import RequirePermission from './RequirePermission'
 
@@ -72,6 +73,9 @@ function AppRoutes() {
           <Route element={<RequirePermission permissions={['inventory:read']} />}>
             <Route path="/inventory/products" element={<ProductsPage />} />
             <Route path="/inventory/categories" element={<CategoriesPage />} />
+          </Route>
+          <Route element={<RequirePermission permissions={['settings:read']} />}>
+            <Route path="/settings/business" element={<BusinessSettingsPage />} />
           </Route>
         </Route>
       </Route>

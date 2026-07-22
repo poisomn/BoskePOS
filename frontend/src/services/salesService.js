@@ -27,6 +27,11 @@ export async function createSale(payload) {
   return data
 }
 
+export async function updateSale(id, payload) {
+  const { data } = await http.patch(`/sales/sales/${id}/`, payload)
+  return data
+}
+
 export async function listSales() {
   const { data } = await http.get('/sales/sales/')
   return normalizeListResponse(data)
@@ -53,4 +58,13 @@ export async function getSale(id) {
 export async function cancelSale(id) {
   const { data } = await http.post(`/sales/sales/${id}/cancel/`)
   return data
+}
+
+export async function completeSale(id, payload = {}) {
+  const { data } = await http.post(`/sales/sales/${id}/complete/`, payload)
+  return data
+}
+
+export async function discardSale(id) {
+  await http.post(`/sales/sales/${id}/discard/`)
 }

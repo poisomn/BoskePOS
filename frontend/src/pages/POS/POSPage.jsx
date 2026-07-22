@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FiAlertTriangle,
+  FiCopy,
   FiCreditCard,
+  FiDollarSign,
   FiMinus,
+  FiPauseCircle,
   FiPlus,
   FiSearch,
   FiShoppingCart,
@@ -18,38 +21,79 @@ import { useAuth } from '../../hooks/useAuth'
 import { listCustomers } from '../../services/customersService'
 import { getProductByBarcode } from '../../services/inventoryService'
 import { quotePosCart, searchPosProducts } from '../../services/posService'
-import { createSale } from '../../services/salesService'
+import {
+  completeSale,
+  createSale,
+  discardSale,
+  listSalesPage,
+  updateSale,
+} from '../../services/salesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatMoney } from '../../utils/formatters'
 
 const emptyQuote = {
   items: [],
   subtotal: '0.00',
+  discount_total: '0.00',
+  tax_total: '0.00',
   total: '0.00',
+}
+
+const paymentMethods = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'debit', label: 'Debito' },
+  { value: 'credit', label: 'Credito' },
+  { value: 'transfer', label: 'Transferencia' },
+]
+
+function createLineId() {
+  return `line-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function normalizeMoneyInput(value) {
+  return String(value ?? '').replace(',', '.').trim()
+}
+
+function buildCartPayloadItems(cartItems) {
+  return cartItems.map((item) => ({
+    line_id: item.line_id,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    discount_amount: item.discount_amount ? normalizeMoneyInput(item.discount_amount) : '0.00',
+    note: item.note || '',
+  }))
 }
 
 function POSPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const barcodeInputRef = useRef(null)
   const searchInputRef = useRef(null)
   const [barcodeError, setBarcodeError] = useState('')
   const [barcodeProduct, setBarcodeProduct] = useState(null)
+  const [activeSuspendedSaleId, setActiveSuspendedSaleId] = useState(null)
   const [cartItems, setCartItems] = useState([])
   const [customerId, setCustomerId] = useState('')
   const [customers, setCustomers] = useState([])
   const [error, setError] = useState('')
   const [isBarcodeLoading, setIsBarcodeLoading] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  const [isLoadingSuspendedSales, setIsLoadingSuspendedSales] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
   const [isRegisteringSale, setIsRegisteringSale] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [isSuspendingSale, setIsSuspendingSale] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [amountPaid, setAmountPaid] = useState('')
   const [quote, setQuote] = useState(emptyQuote)
+  const [saleNotes, setSaleNotes] = useState('')
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [selectedResultIndex, setSelectedResultIndex] = useState(0)
+  const [suspendedSales, setSuspendedSales] = useState([])
 
   useEffect(() => {
-    searchInputRef.current?.focus()
+    barcodeInputRef.current?.focus()
   }, [])
 
   useEffect(() => {
@@ -62,6 +106,23 @@ function POSPage() {
       }
     })
   }, [])
+
+  const fetchSuspendedSales = useCallback(async () => {
+    setIsLoadingSuspendedSales(true)
+
+    try {
+      const data = await listSalesPage({ page: 1, pageSize: 8, status: 'pending' })
+      setSuspendedSales(data.results)
+    } catch {
+      setSuspendedSales([])
+    } finally {
+      setIsLoadingSuspendedSales(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    queueMicrotask(fetchSuspendedSales)
+  }, [fetchSuspendedSales])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -100,7 +161,7 @@ function POSPage() {
     setIsQuoting(true)
 
     try {
-      const quotedCart = await quotePosCart(cartItems)
+      const quotedCart = await quotePosCart(buildCartPayloadItems(cartItems))
       setQuote(quotedCart)
       setError('')
     } catch (requestError) {
@@ -114,10 +175,10 @@ function POSPage() {
     queueMicrotask(refreshQuote)
   }, [refreshQuote])
 
-  const cartQuantityByProductId = useMemo(
+  const cartQuantityByLineId = useMemo(
     () =>
       cartItems.reduce((accumulator, item) => {
-        accumulator[item.product_id] = item.quantity
+        accumulator[item.line_id] = item.quantity
         return accumulator
       }, {}),
     [cartItems],
@@ -129,24 +190,42 @@ function POSPage() {
     searchInputRef.current?.focus()
   }
 
-  function addProduct(product) {
+  function focusBarcode() {
+    barcodeInputRef.current?.focus()
+  }
+
+  function addProduct(product, onAdded = focusBarcode) {
     setCartItems((currentItems) => {
-      const existingItem = currentItems.find((item) => item.product_id === product.id)
+      const existingItem = currentItems.find(
+        (item) =>
+          item.product_id === product.id
+          && !Number(item.discount_amount)
+          && !item.note,
+      )
 
       if (existingItem) {
         return currentItems.map((item) =>
-          item.product_id === product.id
+          item.line_id === existingItem.line_id
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         )
       }
 
-      return [...currentItems, { product_id: product.id, quantity: 1 }]
+      return [
+        ...currentItems,
+        {
+          line_id: createLineId(),
+          product_id: product.id,
+          quantity: 1,
+          discount_amount: '0.00',
+          note: '',
+        },
+      ]
     })
 
     setSearch('')
     setSearchResults([])
-    window.requestAnimationFrame(focusSearch)
+    window.requestAnimationFrame(onAdded)
   }
 
   async function handleBarcodeSubmit(barcode) {
@@ -157,7 +236,7 @@ function POSPage() {
     try {
       const product = await getProductByBarcode(barcode)
       setBarcodeProduct(product)
-      addProduct(product)
+      addProduct(product, focusBarcode)
     } catch (requestError) {
       if (requestError.response?.status === 404) {
         setBarcodeError('No existe un producto activo con ese codigo.')
@@ -168,11 +247,11 @@ function POSPage() {
       }
     } finally {
       setIsBarcodeLoading(false)
-      window.requestAnimationFrame(focusSearch)
+      window.requestAnimationFrame(focusBarcode)
     }
   }
 
-  function updateQuantity(productId, quantity) {
+  function updateQuantity(lineId, quantity) {
     const nextQuantity = Number(quantity)
 
     if (!Number.isInteger(nextQuantity) || nextQuantity < 1) {
@@ -181,21 +260,63 @@ function POSPage() {
 
     setCartItems((currentItems) =>
       currentItems.map((item) =>
-        item.product_id === productId ? { ...item, quantity: nextQuantity } : item,
+        item.line_id === lineId ? { ...item, quantity: nextQuantity } : item,
       ),
     )
   }
 
-  function removeProduct(productId) {
+  function updateLineDiscount(lineId, discountAmount) {
+    const nextDiscount = normalizeMoneyInput(discountAmount)
+
     setCartItems((currentItems) =>
-      currentItems.filter((item) => item.product_id !== productId),
+      currentItems.map((item) =>
+        item.line_id === lineId ? { ...item, discount_amount: nextDiscount } : item,
+      ),
     )
-    window.requestAnimationFrame(focusSearch)
+  }
+
+  function updateLineNote(lineId, note) {
+    setCartItems((currentItems) =>
+      currentItems.map((item) =>
+        item.line_id === lineId ? { ...item, note } : item,
+      ),
+    )
+  }
+
+  function duplicateLine(lineId) {
+    setCartItems((currentItems) => {
+      const sourceIndex = currentItems.findIndex((item) => item.line_id === lineId)
+      if (sourceIndex < 0) return currentItems
+
+      const source = currentItems[sourceIndex]
+      const copy = {
+        ...source,
+        line_id: createLineId(),
+        quantity: 1,
+      }
+
+      return [
+        ...currentItems.slice(0, sourceIndex + 1),
+        copy,
+        ...currentItems.slice(sourceIndex + 1),
+      ]
+    })
+    window.requestAnimationFrame(focusBarcode)
+  }
+
+  function removeProduct(lineId) {
+    setCartItems((currentItems) =>
+      currentItems.filter((item) => item.line_id !== lineId),
+    )
+    window.requestAnimationFrame(focusBarcode)
   }
 
   function clearCart() {
     setCartItems([])
-    window.requestAnimationFrame(focusSearch)
+    setActiveSuspendedSaleId(null)
+    setSaleNotes('')
+    setAmountPaid('')
+    window.requestAnimationFrame(focusBarcode)
   }
 
   function handleSearchKeyDown(event) {
@@ -224,18 +345,90 @@ function POSPage() {
     }
   }
 
+  function buildSalePayload(status = 'completed') {
+    return {
+      customer_id: customerId ? Number(customerId) : null,
+      status,
+      payment_method: paymentMethod,
+      amount_paid: amountPaid ? normalizeMoneyInput(amountPaid) : undefined,
+      notes: saleNotes,
+      items: buildCartPayloadItems(cartItems),
+    }
+  }
+
+  async function handleSuspendSale() {
+    if (!cartItems.length) return
+
+    setIsSuspendingSale(true)
+    setError('')
+
+    try {
+      const payload = buildSalePayload('pending')
+      if (activeSuspendedSaleId) {
+        await updateSale(activeSuspendedSaleId, payload)
+      } else {
+        await createSale(payload)
+      }
+
+      clearCart()
+      await fetchSuspendedSales()
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'No se pudo suspender la venta.'))
+    } finally {
+      setIsSuspendingSale(false)
+    }
+  }
+
+  function recoverSuspendedSale(sale) {
+    setActiveSuspendedSaleId(sale.id)
+    setCustomerId(sale.customer ? String(sale.customer) : '')
+    setPaymentMethod(sale.payment_method || 'cash')
+    setAmountPaid('')
+    setSaleNotes(sale.notes || '')
+    setCartItems(
+      sale.items.map((item) => ({
+        line_id: createLineId(),
+        product_id: item.product,
+        quantity: item.quantity,
+        discount_amount: item.discount_total || '0.00',
+        note: item.note || '',
+      })),
+    )
+    window.requestAnimationFrame(focusBarcode)
+  }
+
+  async function handleDiscardSuspendedSale(saleId) {
+    setError('')
+
+    try {
+      await discardSale(saleId)
+      if (activeSuspendedSaleId === saleId) {
+        clearCart()
+      }
+      await fetchSuspendedSales()
+    } catch (requestError) {
+      setError(getApiErrorMessage(requestError, 'No se pudo eliminar la venta suspendida.'))
+    }
+  }
+
   async function handleConfirmSale() {
     setIsRegisteringSale(true)
     setError('')
 
     try {
-      const sale = await createSale({
-        customer_id: customerId ? Number(customerId) : null,
-        items: cartItems,
-      })
-      setCartItems([])
-      setCustomerId('')
-      setQuote(emptyQuote)
+      let sale
+      if (activeSuspendedSaleId) {
+        await updateSale(activeSuspendedSaleId, buildSalePayload('pending'))
+        sale = await completeSale(activeSuspendedSaleId, {
+          payment_method: paymentMethod,
+          amount_paid: amountPaid ? normalizeMoneyInput(amountPaid) : undefined,
+          notes: saleNotes,
+        })
+      } else {
+        sale = await createSale(buildSalePayload('completed'))
+      }
+
+      clearCart()
       setIsConfirmOpen(false)
       navigate(`/sales/${sale.id}`, {
         replace: true,
@@ -253,6 +446,7 @@ function POSPage() {
     <div className="grid min-h-[calc(100svh-8rem)] w-full gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
       <section className="flex min-h-0 flex-col gap-4">
         <PosStatusBar
+          activeSuspendedSaleId={activeSuspendedSaleId}
           customerName={selectedCustomer?.name ?? 'Consumidor final'}
           isQuoting={isQuoting}
           user={user}
@@ -271,6 +465,7 @@ function POSPage() {
           }}
           onKeyDown={handleSearchKeyDown}
           onSearchChange={setSearch}
+          barcodeInputRef={barcodeInputRef}
           search={search}
           searchInputRef={searchInputRef}
         />
@@ -287,23 +482,39 @@ function POSPage() {
       </section>
 
       <PosCart
+        activeSuspendedSaleId={activeSuspendedSaleId}
+        amountPaid={amountPaid}
         cartItems={cartItems}
-        cartQuantityByProductId={cartQuantityByProductId}
+        cartQuantityByLineId={cartQuantityByLineId}
         customerId={customerId}
         customers={customers}
+        isLoadingSuspendedSales={isLoadingSuspendedSales}
         isQuoting={isQuoting}
         isRegisteringSale={isRegisteringSale}
+        isSuspendingSale={isSuspendingSale}
+        onAmountPaidChange={setAmountPaid}
         onClearCart={clearCart}
         onCustomerChange={setCustomerId}
+        onDiscardSuspendedSale={handleDiscardSuspendedSale}
+        onDuplicateLine={duplicateLine}
+        onLineDiscountChange={updateLineDiscount}
+        onLineNoteChange={updateLineNote}
         onOpenConfirm={() => setIsConfirmOpen(true)}
+        onPaymentMethodChange={setPaymentMethod}
+        onRecoverSuspendedSale={recoverSuspendedSale}
         onRemoveProduct={removeProduct}
+        onSaleNotesChange={setSaleNotes}
+        onSuspendSale={handleSuspendSale}
         onUpdateQuantity={updateQuantity}
+        paymentMethod={paymentMethod}
         quote={quote}
+        saleNotes={saleNotes}
+        suspendedSales={suspendedSales}
       />
 
       <ConfirmDialog
         confirmLabel="Confirmar venta"
-        description={`Se registrara una venta por ${formatMoney(quote.total)}. El inventario se descontara automaticamente.`}
+        description={`Se registrara una venta por ${formatMoney(quote.total)}. Recibido: ${formatMoney(amountPaid || quote.total)}. Vuelto: ${formatMoney(paymentMethod === 'cash' ? Math.max(0, Number(normalizeMoneyInput(amountPaid) || 0) - Number(quote.total || 0)) : 0)}.`}
         isOpen={isConfirmOpen}
         isSubmitting={isRegisteringSale}
         loadingLabel="Registrando..."
@@ -316,10 +527,10 @@ function POSPage() {
   )
 }
 
-function PosStatusBar({ customerName, isQuoting, user }) {
+function PosStatusBar({ activeSuspendedSaleId, customerName, isQuoting, user }) {
   return (
     <section className="surface p-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <StatusItem label="Caja" value="Principal" />
         <StatusItem label="Turno" value="Activo" />
         <StatusItem label="Cajero" value={user?.email ?? 'Usuario'} />
@@ -330,6 +541,14 @@ function PosStatusBar({ customerName, isQuoting, user }) {
           tone={isQuoting ? 'warning' : 'success'}
           value={isQuoting ? 'Recalculando' : 'Conectado'}
         />
+        {activeSuspendedSaleId ? (
+          <StatusItem
+            icon={FiPauseCircle}
+            label="Suspendida"
+            tone="warning"
+            value={`#${activeSuspendedSaleId}`}
+          />
+        ) : null}
       </div>
     </section>
   )
@@ -357,6 +576,7 @@ function ProductSearchPanel({
   isBarcodeLoading,
   isSearching,
   onBarcodeSubmit,
+  barcodeInputRef,
   onClearSearch,
   onKeyDown,
   onSearchChange,
@@ -381,10 +601,28 @@ function ProductSearchPanel({
         </span>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+        <div>
+          <BarcodeInput
+            autoFocus
+            disabled={isBarcodeLoading}
+            isLoading={isBarcodeLoading}
+            label="Escanear codigo de barras"
+            onSubmit={onBarcodeSubmit}
+            placeholder="Escanea o escribe el codigo y presiona Enter"
+            ref={barcodeInputRef}
+          />
+          {barcodeError ? <div className="alert alert-error mt-3">{barcodeError}</div> : null}
+          {barcodeProduct ? (
+            <div className="alert alert-success mt-3">
+              Producto agregado: {barcodeProduct.name}
+            </div>
+          ) : null}
+        </div>
+
         <div>
           <label className="field-label" htmlFor="pos-product-search">
-            Buscar producto
+            Busqueda manual
           </label>
           <div className="relative">
             <FiSearch
@@ -396,7 +634,7 @@ function ProductSearchPanel({
               id="pos-product-search"
               onChange={(event) => onSearchChange(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Nombre, SKU o codigo de barras"
+              placeholder="Nombre, SKU o codigo"
               ref={searchInputRef}
               value={search}
             />
@@ -414,22 +652,6 @@ function ProductSearchPanel({
           <p className="mt-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             {isSearching ? 'Buscando productos...' : 'Usa flechas para seleccionar y Enter para agregar.'}
           </p>
-        </div>
-
-        <div>
-          <BarcodeInput
-            disabled={isBarcodeLoading}
-            isLoading={isBarcodeLoading}
-            label="Escaneo directo"
-            onSubmit={onBarcodeSubmit}
-            placeholder="Escanea y presiona Enter"
-          />
-          {barcodeError ? <div className="alert alert-error mt-3">{barcodeError}</div> : null}
-          {barcodeProduct ? (
-            <div className="alert alert-success mt-3">
-              Producto agregado: {barcodeProduct.name}
-            </div>
-          ) : null}
         </div>
       </div>
     </section>
@@ -513,18 +735,34 @@ function ProductResultRow({ isSelected, onAdd, product }) {
 }
 
 function PosCart({
+  activeSuspendedSaleId,
+  amountPaid,
   cartItems,
-  cartQuantityByProductId,
+  cartQuantityByLineId,
   customerId,
   customers,
+  isLoadingSuspendedSales,
   isQuoting,
   isRegisteringSale,
+  isSuspendingSale,
+  onAmountPaidChange,
   onClearCart,
   onCustomerChange,
+  onDiscardSuspendedSale,
+  onDuplicateLine,
+  onLineDiscountChange,
+  onLineNoteChange,
   onOpenConfirm,
+  onPaymentMethodChange,
+  onRecoverSuspendedSale,
   onRemoveProduct,
+  onSaleNotesChange,
+  onSuspendSale,
   onUpdateQuantity,
+  paymentMethod,
   quote,
+  saleNotes,
+  suspendedSales,
 }) {
   return (
     <aside className="surface flex min-h-[620px] flex-col">
@@ -556,20 +794,47 @@ function PosCart({
             ))}
           </select>
         </label>
+
+        <label className="mt-4 block">
+          <span className="field-label">Observacion de venta</span>
+          <textarea
+            className="textarea min-h-20"
+            onChange={(event) => onSaleNotesChange(event.target.value)}
+            placeholder="Comentario interno para el comprobante"
+            value={saleNotes}
+          />
+        </label>
+
+        <SuspendedSalesPanel
+          activeSuspendedSaleId={activeSuspendedSaleId}
+          isLoading={isLoadingSuspendedSales}
+          onDiscard={onDiscardSuspendedSale}
+          onRecover={onRecoverSuspendedSale}
+          sales={suspendedSales}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {quote.items.length ? (
           <div className="space-y-3">
-            {quote.items.map((item) => (
-              <CartItem
-                item={item}
-                key={item.product_id}
-                onRemove={() => onRemoveProduct(item.product_id)}
-                onUpdateQuantity={(quantity) => onUpdateQuantity(item.product_id, quantity)}
-                quantity={cartQuantityByProductId[item.product_id] ?? item.quantity}
-              />
-            ))}
+            {quote.items.map((item) => {
+              const cartLine = cartItems.find((cartItem) => cartItem.line_id === item.line_id)
+
+              return (
+                <CartItem
+                  discountValue={cartLine?.discount_amount ?? item.discount_total}
+                  item={item}
+                  key={item.line_id || `${item.product_id}-${item.quantity}-${item.line_total}`}
+                  noteValue={cartLine?.note ?? item.note ?? ''}
+                  onDiscountChange={(discount) => onLineDiscountChange(item.line_id, discount)}
+                  onDuplicate={() => onDuplicateLine(item.line_id)}
+                  onNoteChange={(note) => onLineNoteChange(item.line_id, note)}
+                  onRemove={() => onRemoveProduct(item.line_id)}
+                  onUpdateQuantity={(quantity) => onUpdateQuantity(item.line_id, quantity)}
+                  quantity={cartQuantityByLineId[item.line_id] ?? item.quantity}
+                />
+              )
+            })}
           </div>
         ) : (
           <EmptyCart />
@@ -577,17 +842,90 @@ function PosCart({
       </div>
 
       <PaymentSummary
+        amountPaid={amountPaid}
         cartItems={cartItems}
         isQuoting={isQuoting}
         isRegisteringSale={isRegisteringSale}
+        isSuspendingSale={isSuspendingSale}
+        onAmountPaidChange={onAmountPaidChange}
         onOpenConfirm={onOpenConfirm}
+        onPaymentMethodChange={onPaymentMethodChange}
+        onSuspendSale={onSuspendSale}
+        paymentMethod={paymentMethod}
         quote={quote}
       />
     </aside>
   )
 }
 
-function CartItem({ item, onRemove, onUpdateQuantity, quantity }) {
+function SuspendedSalesPanel({
+  activeSuspendedSaleId,
+  isLoading,
+  onDiscard,
+  onRecover,
+  sales,
+}) {
+  return (
+    <div className="mt-4 rounded-lg border p-3" style={{ borderColor: 'var(--color-border)' }}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold">Ventas suspendidas</p>
+        <span className="badge badge-neutral">
+          {isLoading ? 'Cargando' : sales.length}
+        </span>
+      </div>
+      <div className="mt-3 max-h-36 space-y-2 overflow-auto">
+        {sales.length ? (
+          sales.map((sale) => (
+            <div
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md border bg-white p-2 text-sm"
+              key={sale.id}
+              style={{
+                borderColor: activeSuspendedSaleId === sale.id
+                  ? 'var(--color-brand-600)'
+                  : 'var(--color-border)',
+              }}
+            >
+              <button
+                className="min-w-0 text-left"
+                onClick={() => onRecover(sale)}
+                type="button"
+              >
+                <span className="block truncate font-semibold">Venta #{sale.id}</span>
+                <span className="block truncate text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  {sale.customer_name || 'Consumidor final'} - {formatMoney(sale.total)}
+                </span>
+              </button>
+              <button
+                aria-label={`Eliminar venta suspendida ${sale.id}`}
+                className="icon-btn"
+                onClick={() => onDiscard(sale.id)}
+                type="button"
+              >
+                <FiTrash2 aria-hidden="true" />
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            No hay ventas suspendidas.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CartItem({
+  discountValue,
+  item,
+  noteValue,
+  onDiscountChange,
+  onDuplicate,
+  onNoteChange,
+  onRemove,
+  onUpdateQuantity,
+  quantity,
+}) {
   const stockExceeded = Number(quantity) > Number(item.available_stock)
 
   return (
@@ -642,24 +980,95 @@ function CartItem({ item, onRemove, onUpdateQuantity, quantity }) {
         </button>
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <span style={{ color: 'var(--color-text-muted)' }}>
-          {item.quantity} x {formatMoney(item.unit_price)}
-        </span>
-        <strong>{formatMoney(item.line_subtotal)}</strong>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label>
+          <span className="field-label">Descuento linea</span>
+          <input
+            className="input"
+            inputMode="decimal"
+            min="0"
+            onChange={(event) => onDiscountChange(event.target.value)}
+            placeholder="0"
+            type="text"
+            value={discountValue}
+          />
+        </label>
+        <label>
+          <span className="field-label">Observacion</span>
+          <input
+            className="input"
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="Opcional"
+            type="text"
+            value={noteValue}
+          />
+        </label>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div style={{ color: 'var(--color-text-muted)' }}>
+          <span>{item.quantity} x {formatMoney(item.unit_price)}</span>
+          <span className="ml-2">IVA {formatMoney(item.tax_total)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-secondary h-9 px-3" onClick={onDuplicate} type="button">
+            <FiCopy aria-hidden="true" />
+            Duplicar
+          </button>
+          <strong>{formatMoney(item.line_total ?? item.line_subtotal)}</strong>
+        </div>
       </div>
     </article>
   )
 }
 
-function PaymentSummary({ cartItems, isQuoting, isRegisteringSale, onOpenConfirm, quote }) {
+function PaymentSummary({
+  amountPaid,
+  cartItems,
+  isQuoting,
+  isRegisteringSale,
+  isSuspendingSale,
+  onAmountPaidChange,
+  onOpenConfirm,
+  onPaymentMethodChange,
+  onSuspendSale,
+  paymentMethod,
+  quote,
+}) {
+  const total = Number(quote.total || 0)
+  const paid = Number(normalizeMoneyInput(amountPaid) || 0)
+  const change = paymentMethod === 'cash' ? Math.max(0, paid - total) : 0
+  const canCharge = Boolean(cartItems.length) && !isQuoting && !isRegisteringSale
+
   return (
     <div className="border-t p-5" style={{ borderColor: 'var(--color-border)' }}>
       <div className="mb-4 rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--color-border)' }}>
-        <p className="font-semibold">Cobro MVP</p>
-        <p className="mt-1" style={{ color: 'var(--color-text-muted)' }}>
-          Esta version registra la venta y descuenta inventario. El metodo de pago no se guarda aun.
-        </p>
+        <p className="font-semibold">Medio de pago</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {paymentMethods.map((method) => (
+            <button
+              className={`btn h-10 ${paymentMethod === method.value ? 'btn-primary' : 'btn-secondary'}`}
+              key={method.value}
+              onClick={() => onPaymentMethodChange(method.value)}
+              type="button"
+            >
+              {method.label}
+            </button>
+          ))}
+        </div>
+        {paymentMethod === 'cash' ? (
+          <label className="mt-3 block">
+            <span className="field-label">Efectivo recibido</span>
+            <input
+              className="input"
+              inputMode="decimal"
+              onChange={(event) => onAmountPaidChange(event.target.value)}
+              placeholder="Ej: 10000"
+              type="text"
+              value={amountPaid}
+            />
+          </label>
+        ) : null}
       </div>
 
       <div className="space-y-3">
@@ -669,12 +1078,24 @@ function PaymentSummary({ cartItems, isQuoting, isRegisteringSale, onOpenConfirm
         </div>
         <div className="flex justify-between text-sm">
           <span style={{ color: 'var(--color-text-muted)' }}>Descuentos</span>
-          <strong>{formatMoney(0)}</strong>
+          <strong>{formatMoney(quote.discount_total)}</strong>
         </div>
         <div className="flex justify-between text-sm">
           <span style={{ color: 'var(--color-text-muted)' }}>Impuestos</span>
-          <strong>Incluidos si aplica</strong>
+          <strong>{formatMoney(quote.tax_total)}</strong>
         </div>
+        {paymentMethod === 'cash' ? (
+          <div className="rounded-lg border p-3 text-sm" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex justify-between">
+              <span style={{ color: 'var(--color-text-muted)' }}>Recibido</span>
+              <strong>{formatMoney(paid)}</strong>
+            </div>
+            <div className="mt-2 flex justify-between">
+              <span style={{ color: 'var(--color-text-muted)' }}>Vuelto</span>
+              <strong>{formatMoney(change)}</strong>
+            </div>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between border-t pt-4" style={{ borderColor: 'var(--color-border)' }}>
           <span className="text-lg font-semibold">Total</span>
           <strong className="text-3xl" style={{ color: 'var(--color-brand-700)' }}>
@@ -682,12 +1103,21 @@ function PaymentSummary({ cartItems, isQuoting, isRegisteringSale, onOpenConfirm
           </strong>
         </div>
         <button
+          className="btn btn-secondary mt-3 h-11 w-full text-base"
+          disabled={!cartItems.length || isQuoting || isSuspendingSale}
+          onClick={onSuspendSale}
+          type="button"
+        >
+          <FiPauseCircle aria-hidden="true" />
+          {isSuspendingSale ? 'Guardando...' : 'Suspender venta'}
+        </button>
+        <button
           className="btn btn-primary mt-3 h-12 w-full text-base"
-          disabled={!cartItems.length || isQuoting || isRegisteringSale}
+          disabled={!canCharge}
           onClick={onOpenConfirm}
           type="button"
         >
-          <FiCreditCard aria-hidden="true" />
+          {paymentMethod === 'cash' ? <FiDollarSign aria-hidden="true" /> : <FiCreditCard aria-hidden="true" />}
           Cobrar venta
         </button>
       </div>
