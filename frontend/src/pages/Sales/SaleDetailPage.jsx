@@ -5,7 +5,7 @@ import { FiArrowLeft, FiCheckCircle, FiFileText, FiPrinter, FiXCircle } from 're
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useAuth } from '../../hooks/useAuth'
 import { cancelSale, getSale } from '../../services/salesService'
-import { getBusinessSettings } from '../../services/settingsService'
+import { getReceiptSettings } from '../../services/settingsService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 import { formatDateTime, formatMoney } from '../../utils/formatters'
 
@@ -29,7 +29,7 @@ function SaleDetailPage() {
     try {
       const [saleData, settingsData] = await Promise.all([
         getSale(saleId),
-        getBusinessSettings().catch(() => null),
+        getReceiptSettings(),
       ])
       setSale(saleData)
       setSettings(settingsData)
@@ -108,6 +108,7 @@ function SaleDetailPage() {
                 {settings?.business_name || 'BoskePOS'}
               </p>
               <h1 className="mt-1 text-2xl font-semibold">Venta #{sale.id}</h1>
+              <p className="mt-1 text-sm">Comprobante interno. No es una boleta ni factura tributaria.</p>
               <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 {formatDateTime(sale.created_at)}
               </p>

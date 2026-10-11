@@ -86,6 +86,8 @@ function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [amountPaid, setAmountPaid] = useState('')
   const [quote, setQuote] = useState(emptyQuote)
+  const [quotedItems, setQuotedItems] = useState(null)
+  const [quoteError, setQuoteError] = useState('')
   const [saleNotes, setSaleNotes] = useState('')
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -125,6 +127,7 @@ function POSPage() {
   }, [fetchSuspendedSales])
 
   useEffect(() => {
+    const controller = new AbortController()
     const timeoutId = window.setTimeout(() => {
       queueMicrotask(async () => {
         if (!search.trim()) {
@@ -137,43 +140,53 @@ function POSPage() {
         setError('')
 
         try {
-          const products = await searchPosProducts(search.trim())
+          const products = await searchPosProducts(search.trim(), { signal: controller.signal })
+          if (controller.signal.aborted) return
           setSearchResults(products.slice(0, 8))
           setSelectedResultIndex(0)
         } catch (requestError) {
+          if (controller.signal.aborted) return
           setError(getApiErrorMessage(requestError, 'No se pudo buscar productos.'))
         } finally {
-          setIsSearching(false)
+          if (!controller.signal.aborted) setIsSearching(false)
         }
       })
     }, 180)
 
-    return () => window.clearTimeout(timeoutId)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeoutId)
+    }
   }, [search])
 
-  const refreshQuote = useCallback(async () => {
-    if (!cartItems.length) {
-      setQuote(emptyQuote)
-      setError('')
-      return
-    }
-
-    setIsQuoting(true)
-
-    try {
-      const quotedCart = await quotePosCart(buildCartPayloadItems(cartItems))
-      setQuote(quotedCart)
-      setError('')
-    } catch (requestError) {
-      setError(getApiErrorMessage(requestError, 'No se pudo recalcular el carrito.'))
-    } finally {
-      setIsQuoting(false)
-    }
+  useEffect(() => {
+    const controller = new AbortController()
+    queueMicrotask(async () => {
+      if (controller.signal.aborted) return
+      setQuoteError('')
+      if (!cartItems.length) {
+        setQuote(emptyQuote)
+        setQuotedItems(cartItems)
+        setIsQuoting(false)
+        return
+      }
+      setIsQuoting(true)
+      try {
+        const quotedCart = await quotePosCart(buildCartPayloadItems(cartItems), { signal: controller.signal })
+        if (controller.signal.aborted) return
+        setQuote(quotedCart)
+        setQuotedItems(cartItems)
+      } catch (requestError) {
+        if (controller.signal.aborted) return
+        setQuoteError(getApiErrorMessage(requestError, 'No se pudo recalcular el carrito.'))
+      } finally {
+        if (!controller.signal.aborted) setIsQuoting(false)
+      }
+    })
+    return () => controller.abort()
   }, [cartItems])
 
-  useEffect(() => {
-    queueMicrotask(refreshQuote)
-  }, [refreshQuote])
+  const isQuoteReady = quotedItems === cartItems && !quoteError && !isQuoting
 
   const cartQuantityByLineId = useMemo(
     () =>
@@ -316,6 +329,9 @@ function POSPage() {
     setActiveSuspendedSaleId(null)
     setSaleNotes('')
     setAmountPaid('')
+    setCustomerId('')
+    setPaymentMethod('cash')
+    setError('')
     window.requestAnimationFrame(focusBarcode)
   }
 
@@ -357,7 +373,7 @@ function POSPage() {
   }
 
   async function handleSuspendSale() {
-    if (!cartItems.length) return
+    if (!cartItems.length || !isQuoteReady || isSuspendingSale || isRegisteringSale) return
 
     setIsSuspendingSale(true)
     setError('')
@@ -412,6 +428,7 @@ function POSPage() {
   }
 
   async function handleConfirmSale() {
+    if (!cartItems.length || !isQuoteReady || isRegisteringSale || isSuspendingSale) return
     setIsRegisteringSale(true)
     setError('')
 
@@ -471,6 +488,7 @@ function POSPage() {
         />
 
         {error ? <div className="alert alert-error">{error}</div> : null}
+        {quoteError ? <div className="alert alert-error" role="alert">{quoteError}</div> : null}
 
         <ProductResults
           isSearching={isSearching}
@@ -489,6 +507,7 @@ function POSPage() {
         customerId={customerId}
         customers={customers}
         isLoadingSuspendedSales={isLoadingSuspendedSales}
+        isQuoteReady={isQuoteReady}
         isQuoting={isQuoting}
         isRegisteringSale={isRegisteringSale}
         isSuspendingSale={isSuspendingSale}
@@ -499,7 +518,7 @@ function POSPage() {
         onDuplicateLine={duplicateLine}
         onLineDiscountChange={updateLineDiscount}
         onLineNoteChange={updateLineNote}
-        onOpenConfirm={() => setIsConfirmOpen(true)}
+        onOpenConfirm={() => { if (isQuoteReady) setIsConfirmOpen(true) }}
         onPaymentMethodChange={setPaymentMethod}
         onRecoverSuspendedSale={recoverSuspendedSale}
         onRemoveProduct={removeProduct}
@@ -532,14 +551,14 @@ function PosStatusBar({ activeSuspendedSaleId, customerName, isQuoting, user }) 
     <section className="surface p-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <StatusItem label="Caja" value="Principal" />
-        <StatusItem label="Turno" value="Activo" />
+        <StatusItem label="Sesion" value="Iniciada" />
         <StatusItem label="Cajero" value={user?.email ?? 'Usuario'} />
         <StatusItem label="Cliente" value={customerName} />
         <StatusItem
           icon={FiWifi}
-          label="Servicios"
+          label="Carrito"
           tone={isQuoting ? 'warning' : 'success'}
-          value={isQuoting ? 'Recalculando' : 'Conectado'}
+          value={isQuoting ? 'Recalculando' : 'En edicion'}
         />
         {activeSuspendedSaleId ? (
           <StatusItem
@@ -742,6 +761,7 @@ function PosCart({
   customerId,
   customers,
   isLoadingSuspendedSales,
+  isQuoteReady,
   isQuoting,
   isRegisteringSale,
   isSuspendingSale,
@@ -842,6 +862,7 @@ function PosCart({
       </div>
 
       <PaymentSummary
+        isQuoteReady={isQuoteReady}
         amountPaid={amountPaid}
         cartItems={cartItems}
         isQuoting={isQuoting}
@@ -1023,6 +1044,7 @@ function CartItem({
 }
 
 function PaymentSummary({
+  isQuoteReady,
   amountPaid,
   cartItems,
   isQuoting,
@@ -1038,7 +1060,7 @@ function PaymentSummary({
   const total = Number(quote.total || 0)
   const paid = Number(normalizeMoneyInput(amountPaid) || 0)
   const change = paymentMethod === 'cash' ? Math.max(0, paid - total) : 0
-  const canCharge = Boolean(cartItems.length) && !isQuoting && !isRegisteringSale
+  const canCharge = Boolean(cartItems.length) && isQuoteReady && !isQuoting && !isRegisteringSale && !isSuspendingSale
 
   return (
     <div className="border-t p-5" style={{ borderColor: 'var(--color-border)' }}>
@@ -1104,7 +1126,7 @@ function PaymentSummary({
         </div>
         <button
           className="btn btn-secondary mt-3 h-11 w-full text-base"
-          disabled={!cartItems.length || isQuoting || isSuspendingSale}
+          disabled={!canCharge}
           onClick={onSuspendSale}
           type="button"
         >

@@ -27,6 +27,8 @@ Los limites diarios se calculan con la zona horaria configurada en Django. No se
 
 Suma de `Sale.total` para ventas con estado `completed` dentro del rango solicitado.
 
+Desde v0.2.1 el período usa `completed_at`; para registros históricos sin esa fecha usa `created_at`. La misma regla se aplica a la serie diaria y productos más vendidos. Las operaciones recientes muestran las últimas operaciones globales, no solo las del período; los indicadores de inventario representan el saldo actual.
+
 Excluye:
 
 - `pending`

@@ -6,8 +6,11 @@ from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Product, StockMovement
 from apps.inventory.services import StockMovementError, apply_stock_movement
+from apps.utils.money import validate_money_capacity
 
 from .models import Sale, SaleItem
+
+UNSET = object()
 
 
 class SaleConflict(Exception):
@@ -96,37 +99,44 @@ def update_pending_sale(
     *,
     sale,
     user,
-    customer=None,
-    items,
-    payment_method=Sale.PaymentMethod.CASH,
-    amount_paid=None,
-    notes='',
+    customer=UNSET,
+    items=None,
+    payment_method=UNSET,
+    amount_paid=UNSET,
+    notes=UNSET,
 ):
     sale = Sale.objects.select_for_update().get(pk=sale.pk)
 
     if sale.status != Sale.Status.PENDING:
         raise SaleConflict('Solo se puede editar una venta pendiente.')
 
-    products = _get_active_products(items)
-    _validate_available_stock(items, products)
-    totals = _build_sale_lines(items, products)
+    totals = None
+    if items is not None:
+        if not items:
+            raise ValidationError({'items': 'La venta debe incluir al menos un producto.'})
+        products = _get_active_products(items)
+        _validate_available_stock(items, products)
+        totals = _build_sale_lines(items, products)
     payment = _build_payment(
         status=Sale.Status.PENDING,
-        total=totals['total'],
-        payment_method=payment_method,
-        amount_paid=amount_paid,
+        total=totals['total'] if totals else sale.total,
+        payment_method=sale.payment_method if payment_method is UNSET else payment_method,
+        amount_paid=sale.amount_paid if amount_paid is UNSET else amount_paid,
     )
 
-    sale.customer = customer
+    if customer is not UNSET:
+        sale.customer = customer
     sale.user = user
-    sale.subtotal = totals['subtotal']
-    sale.discount_total = totals['discount_total']
-    sale.tax_total = totals['tax_total']
-    sale.total = totals['total']
+    if totals:
+        sale.subtotal = totals['subtotal']
+        sale.discount_total = totals['discount_total']
+        sale.tax_total = totals['tax_total']
+        sale.total = totals['total']
     sale.payment_method = payment['payment_method']
     sale.amount_paid = payment['amount_paid']
     sale.change_amount = payment['change_amount']
-    sale.notes = (notes or '').strip()
+    if notes is not UNSET:
+        sale.notes = (notes or '').strip()
     sale.save(
         update_fields=(
             'customer',
@@ -141,10 +151,11 @@ def update_pending_sale(
             'notes',
         )
     )
-    sale.items.all().delete()
-    SaleItem.objects.bulk_create(
-        SaleItem(sale=sale, **item_data) for item_data in totals['sale_items_data']
-    )
+    if totals:
+        sale.items.all().delete()
+        SaleItem.objects.bulk_create(
+            SaleItem(sale=sale, **item_data) for item_data in totals['sale_items_data']
+        )
 
     return Sale.objects.prefetch_related('items').select_related('customer', 'user').get(pk=sale.pk)
 
@@ -244,7 +255,7 @@ def cancel_sale(*, sale, user):
     if sale.status == Sale.Status.CANCELLED:
         raise SaleConflict('La venta ya esta anulada.')
 
-    for item in sale.items.select_related('product'):
+    for item in sale.items.select_related('product').order_by('product_id'):
         try:
             apply_stock_movement(
                 product=item.product,
@@ -328,6 +339,7 @@ def _build_sale_lines(items, products):
         line_total = line_subtotal - line_discount
         line_tax = _calculate_included_tax(line_total, product.tax_rate)
         subtotal += line_subtotal
+        validate_money_capacity(subtotal)
         discount_total += line_discount
         tax_total += line_tax
 

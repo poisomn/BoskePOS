@@ -2,13 +2,42 @@
 
 BoskePOS es un ERP/POS para ferreterias chilenas construido con Django, Django REST Framework, PostgreSQL, React, Vite y Tailwind CSS.
 
-Este repositorio contiene el cierre del MVP v0.1-R1. La logica de negocio vive en el backend; el frontend consume la API REST.
+El proyecto parte del MVP v0.2 y contiene una revisión de estabilización **v0.2.1**, validada localmente. La lógica de negocio vive en el backend; el frontend consume la API REST. Esta revisión no representa una puesta en producción ni una certificación tributaria.
+
+## Auditoría y Proyecto de Título
+
+- [Documento Word de auditoría y plan académico](output/docx/BoskePOS_Auditoria_y_Plan_Proyecto_de_Titulo.docx)
+- [Resultados y cambios realizados](docs/auditoria-mvp-v0.2.1.md)
+- [Plan de versiones y criterios de aceptación](docs/roadmap-mvp.md)
+- [Revisión del informe académico](docs/proyecto-titulo/revision-informe.md)
+- [Trazabilidad de requerimientos](docs/proyecto-titulo/trazabilidad.md)
+- [Plan de validación con usuarios](docs/proyecto-titulo/plan-validacion.md)
+- [Arquitectura y modelo de datos](docs/architecture.md)
+
+## Demostración aislada en Windows
+
+Con las dependencias instaladas, ejecutar desde la raíz:
+
+```powershell
+.\scripts\start-demo.ps1
+```
+
+En otra terminal:
+
+```powershell
+cd frontend
+npm.cmd run dev -- --host 127.0.0.1 --strictPort
+```
+
+Abrir `http://127.0.0.1:5173`. Las credenciales aleatorias están en `logs/demo-access.json`.
+La demo usa exclusivamente `logs/demo.sqlite3`, con catálogo ficticio, y no modifica PostgreSQL.
+Detener cada proceso con Ctrl+C. SQLite sirve para demostración; las pruebas de concurrencia requieren PostgreSQL.
 
 ## Requisitos
 
-- Python 3.13
+- Python 3.13 (verificado con 3.13.2)
 - PostgreSQL
-- Node.js y npm
+- Node.js 22.12 o posterior y npm
 - PowerShell en Windows
 
 ## Backend
@@ -46,14 +75,16 @@ Aplicar migraciones y datos base:
 python manage.py migrate
 python manage.py seed_roles
 python manage.py seed_inventory
-python manage.py create_initial_stock_movements
 ```
 
 Crear usuario administrador:
 
 ```powershell
 python manage.py createsuperuser
+python manage.py create_initial_stock_movements --user-email correo-del-administrador
 ```
+
+`seed_inventory` es para datos de demostración. No ejecutarlo sobre un catálogo real: actualiza los productos del seed. Crear saldos iniciales únicamente durante una carga controlada antes de comenzar operaciones.
 
 Ejecutar backend:
 
@@ -67,7 +98,7 @@ Instalar dependencias:
 
 ```powershell
 cd frontend
-npm install
+npm ci
 copy .env.example .env
 ```
 
@@ -93,7 +124,12 @@ Backend:
 python manage.py check
 python manage.py makemigrations --check --dry-run
 python manage.py test --keepdb
+python manage.py audit_stock --strict
 ```
+
+`audit_stock` es de solo lectura y contrasta el Kardex con el saldo almacenado. Ejecutarlo durante una pausa de escrituras; no sustituye el conteo físico. Sobre datos históricos sin movimientos iniciales puede informar diferencias que requieren revisión.
+
+La integración continua en `.github/workflows/quality.yml` ejecuta pruebas sobre PostgreSQL, migraciones, lint, build y auditoría npm. El flujo queda preparado; su ejecución remota depende de publicar los cambios en GitHub.
 
 Frontend:
 
@@ -147,7 +183,7 @@ python manage.py seed_roles
 
 La matriz completa esta documentada en `docs/auth-permissions.md`.
 
-## Restricciones del MVP v0.1-R1
+## Restricciones del MVP v0.2.1
 
 No incluye:
 
@@ -158,11 +194,23 @@ No incluye:
 - Multiples bodegas o sucursales.
 - Roles avanzados.
 - Reportes BI.
+- Cierre de caja y conciliación de pagos.
+- Cantidades fraccionarias (stock y cantidades son enteros).
+- Importación y exportación masiva de catálogo.
+- Validación de SLA productivos y piloto con usuarios reales.
 
-## Cierre v0.1-R1
+## Historial
 
-La auditoria de cierre, validaciones ejecutadas, deuda tecnica y riesgos para v0.2 estan en:
+El cierre histórico de v0.1-R1 está en:
 
 ```text
 docs/mvp-v0.1-r1-closeout.md
 ```
+
+El alcance de v0.2 está en `docs/mvp-v0.2-closeout.md`. La planificación vigente propuesta es `docs/roadmap-mvp.md`.
+
+## Operación y seguridad
+
+`GET /api/health/` responde 200 si la base de datos está disponible y 503 si falla; no expone detalles de infraestructura. Login tiene límite por IP de 10 intentos/minuto y refresh de 60/minuto, configurables en `.env`. El caché local no sustituye protección compartida del reverse proxy en producción.
+
+Para un despliegue real: `DEBUG=False`, secreto aleatorio de al menos 50 caracteres, hosts/orígenes explícitos, TLS, backups y restauración ensayada. Las cookies seguras y la redirección HTTPS se habilitan por defecto con `DEBUG=False`. Activar HSTS solo después de validar TLS; subdominios y preload requieren una decisión del despliegue. `python manage.py check --deploy` debe revisarse en ese entorno. El administrador Django permite consultar ventas/compras, pero los cambios transaccionales deben realizarse desde la aplicación.

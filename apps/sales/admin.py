@@ -1,9 +1,11 @@
 from django.contrib import admin
 
+from apps.utils.admin import ReadOnlyTransactionAdminMixin
+
 from .models import Sale, SaleItem
 
 
-class SaleItemInline(admin.TabularInline):
+class SaleItemInline(ReadOnlyTransactionAdminMixin, admin.TabularInline):
     model = SaleItem
     extra = 0
     readonly_fields = (
@@ -21,7 +23,7 @@ class SaleItemInline(admin.TabularInline):
 
 
 @admin.register(Sale)
-class SaleAdmin(admin.ModelAdmin):
+class SaleAdmin(ReadOnlyTransactionAdminMixin, admin.ModelAdmin):
     list_display = (
         'id',
         'customer',

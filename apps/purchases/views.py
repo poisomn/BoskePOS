@@ -5,10 +5,11 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.accounts.permissions import PurchasePermission
+from apps.utils.query_params import validated_filters
 
 from .models import Purchase
 from .serializers import PurchaseListSerializer, PurchaseSerializer, PurchaseWriteSerializer
-from .services import PurchaseConflict, cancel_purchase, confirm_purchase
+from .services import PurchaseConflict, cancel_purchase, confirm_purchase, discard_purchase_draft
 
 
 class PurchasePagination(PageNumberPagination):
@@ -29,11 +30,13 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         if self.action == 'retrieve':
             queryset = queryset.prefetch_related('items__product')
 
-        supplier = self.request.query_params.get('supplier')
-        status_value = self.request.query_params.get('status')
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
-        user = self.request.query_params.get('user')
+        params = validated_filters(self.request.query_params, ids=('supplier', 'user'),
+                                   choices={'status': Purchase.Status.values})
+        supplier = params.get('supplier')
+        status_value = params.get('status')
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
+        user = params.get('user')
         search = self.request.query_params.get('search', '').strip()
 
         if supplier:
@@ -83,13 +86,11 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        purchase = self.get_object()
-        if purchase.status != Purchase.Status.DRAFT:
-            return Response(
-                {'detail': 'No se pueden eliminar compras confirmadas o anuladas.'},
-                status=status.HTTP_409_CONFLICT,
-            )
-        return super().destroy(request, *args, **kwargs)
+        try:
+            discard_purchase_draft(purchase=self.get_object())
+        except PurchaseConflict as exc:
+            return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=('post',))
     def confirm(self, request, pk=None):

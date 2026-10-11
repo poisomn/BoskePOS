@@ -1,14 +1,17 @@
 import { Outlet } from 'react-router-dom'
+import { useState } from 'react'
 
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 
 function AppLayout() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   return (
     <main className="app-shell flex min-h-svh">
       <Sidebar />
       <section className="flex min-w-0 flex-1 flex-col">
-        <Navbar />
+        <Navbar isMenuOpen={isMenuOpen} onToggleMenu={() => setIsMenuOpen((open) => !open)} />
+        {isMenuOpen ? <div id="mobile-navigation"><Sidebar mobile onNavigate={() => setIsMenuOpen(false)} /></div> : null}
         <div className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>

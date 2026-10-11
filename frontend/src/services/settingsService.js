@@ -1,5 +1,10 @@
 import { http } from '../api/http'
 
+export async function getReceiptSettings() {
+  const { data } = await http.get('/settings/receipt/')
+  return data
+}
+
 
 export async function getBusinessSettings() {
   const { data } = await http.get('/settings/business/')

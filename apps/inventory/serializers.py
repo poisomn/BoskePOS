@@ -42,6 +42,15 @@ class CategorySerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     category_detail = CategorySerializer(source='category', read_only=True)
 
+    def update(self, instance, validated_data):
+        # Never write a stale stock/cost balance while editing catalog metadata.
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        if validated_data:
+            instance.save(update_fields=(*validated_data.keys(), 'updated_at'))
+        instance.refresh_from_db()
+        return instance
+
     class Meta:
         model = Product
         fields = (

@@ -1,11 +1,11 @@
 from django.db.models import F, ProtectedError, Q
-from django.utils.dateparse import parse_date
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from apps.accounts.permissions import InventoryPermission, StockMovementPermission
+from apps.utils.query_params import validated_filters
 
 from .models import Category, Product, StockMovement
 from .serializers import (
@@ -99,7 +99,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        category = self.request.query_params.get('category')
+        category = validated_filters(self.request.query_params, ids=('category',)).get('category')
         is_active = self.request.query_params.get('is_active')
         low_stock = self.request.query_params.get('low_stock')
         out_of_stock = self.request.query_params.get('out_of_stock')
@@ -129,6 +129,15 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(barcode=barcode.strip())
 
         return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {'detail': 'El producto tiene operaciones asociadas. Desactivalo para conservar su historial.'},
+                status=status.HTTP_409_CONFLICT,
+            )
 
     @action(
         detail=False,
@@ -222,11 +231,13 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        product = self.request.query_params.get('product')
-        movement_type = self.request.query_params.get('movement_type')
-        user = self.request.query_params.get('user')
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
+        params = validated_filters(self.request.query_params, ids=('product', 'user'),
+                                   choices={'movement_type': StockMovement.MovementType.values})
+        product = params.get('product')
+        movement_type = params.get('movement_type')
+        user = params.get('user')
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
         search = self.request.query_params.get('search', '').strip()
 
         if product:
@@ -239,14 +250,10 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(user_id=user)
 
         if date_from:
-            parsed_date_from = parse_date(date_from)
-            if parsed_date_from:
-                queryset = queryset.filter(created_at__date__gte=parsed_date_from)
+            queryset = queryset.filter(created_at__date__gte=date_from)
 
         if date_to:
-            parsed_date_to = parse_date(date_to)
-            if parsed_date_to:
-                queryset = queryset.filter(created_at__date__lte=parsed_date_to)
+            queryset = queryset.filter(created_at__date__lte=date_to)
 
         if search:
             queryset = queryset.filter(
@@ -254,6 +261,7 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
                 | Q(product__sku__icontains=search.upper())
                 | Q(product__barcode__icontains=search)
                 | Q(reason__icontains=search)
+                | Q(reference__icontains=search)
             )
 
         return queryset

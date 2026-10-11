@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 from apps.inventory.models import Product, StockMovement
 from apps.inventory.services import StockMovementError, apply_stock_movement
 from apps.suppliers.models import Supplier
+from apps.utils.money import validate_money_capacity
 
 from .models import Purchase, PurchaseItem
 
@@ -26,6 +27,7 @@ def calculate_purchase_totals(items):
         unit_cost = item['unit_cost']
         line_total = (unit_cost * quantity).quantize(Decimal('0.01'))
         subtotal += line_total
+        validate_money_capacity(subtotal)
         calculated_items.append({**item, 'line_total': line_total})
 
     total = subtotal.quantize(Decimal('0.01'))
@@ -34,6 +36,8 @@ def calculate_purchase_totals(items):
 
 @transaction.atomic
 def save_purchase_draft(*, user, supplier, items, reference='', notes='', purchase=None):
+    if purchase is not None:
+        purchase = Purchase.objects.select_for_update().get(pk=purchase.pk)
     if not supplier.is_active:
         raise ValidationError({'supplier_id': 'El proveedor no esta activo.'})
 
@@ -103,7 +107,7 @@ def confirm_purchase(*, purchase, user):
     if purchase.status == Purchase.Status.CANCELLED:
         raise PurchaseConflict('Una compra anulada no puede confirmarse.')
 
-    items = list(purchase.items.select_related('product'))
+    items = list(purchase.items.select_related('product').order_by('product_id'))
     if not items:
         raise ValidationError({'items': 'La compra debe incluir al menos una linea.'})
 
@@ -147,7 +151,7 @@ def cancel_purchase(*, purchase, user):
     if purchase.status == Purchase.Status.CANCELLED:
         raise PurchaseConflict('La compra ya esta anulada.')
 
-    items = list(purchase.items.select_related('product'))
+    items = list(purchase.items.select_related('product').order_by('product_id'))
 
     for item in items:
         try:
@@ -167,6 +171,14 @@ def cancel_purchase(*, purchase, user):
     purchase.save(update_fields=('status', 'cancelled_at', 'updated_at'))
 
     return get_purchase_for_detail(purchase.pk)
+
+
+@transaction.atomic
+def discard_purchase_draft(*, purchase):
+    purchase = Purchase.objects.select_for_update().get(pk=purchase.pk)
+    if purchase.status != Purchase.Status.DRAFT:
+        raise PurchaseConflict('No se pueden eliminar compras confirmadas o anuladas.')
+    purchase.delete()
 
 
 def get_purchase_for_detail(pk):

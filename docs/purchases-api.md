@@ -2,6 +2,8 @@
 
 El backend es la fuente de verdad para estados, subtotales, total e impacto de inventario.
 
+Desde v0.2.1 editar o eliminar un borrador bloquea y relee la compra: una instancia antigua no puede cambiar una operación ya confirmada. Ventas y compras son de solo lectura en Django Admin. La anulación de compra revierte unidades, pero todavía no revierte el costo promedio; esta limitación debe resolverse antes de usar valorización para decisiones operativas.
+
 ## Estados
 
 - `draft`: borrador editable.

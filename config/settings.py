@@ -1,6 +1,8 @@
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # pyrefly: ignore [missing-import]
 from decouple import Csv, config
 
@@ -14,6 +16,15 @@ SECRET_KEY = config(
 )
 
 DEBUG = config('DEBUG', default=True, cast=bool)
+
+if not DEBUG and (len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5 or SECRET_KEY.startswith('django-insecure-')):
+    raise ImproperlyConfigured('Configura una SECRET_KEY aleatoria de al menos 50 caracteres para produccion.')
+
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=not DEBUG, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
+# Enable only after verifying HTTPS for the whole deployment.
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
@@ -96,13 +107,15 @@ if DB_ENGINE == 'postgresql':
             'PORT': config('POSTGRES_PORT', default='5432'),
         }
     }
-else:
+elif DB_ENGINE == 'sqlite':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / config('SQLITE_NAME', default='db.sqlite3'),
         }
     }
+else:
+    raise ImproperlyConfigured('DB_ENGINE debe ser postgresql o sqlite.')
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -154,6 +167,10 @@ CSRF_TRUSTED_ORIGINS = config(
 )
 
 REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_RATES': {
+        'login': config('LOGIN_THROTTLE_RATE', default='10/min'),
+        'token_refresh': config('REFRESH_THROTTLE_RATE', default='60/min'),
+    },
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),

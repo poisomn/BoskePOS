@@ -3,6 +3,14 @@ from rest_framework import serializers
 from .models import BusinessSettings
 
 
+class ReceiptSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessSettings
+        fields = ('business_name', 'rut', 'giro', 'address', 'city', 'phone',
+                  'email', 'currency', 'ticket_footer')
+        read_only_fields = fields
+
+
 class BusinessSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessSettings

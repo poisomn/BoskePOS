@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import SalePermission
 from apps.inventory.models import Product
+from apps.utils.query_params import validated_filters
 
 from .models import Sale
 from .serializers import (
@@ -44,13 +45,13 @@ class PosProductSearchView(generics.ListAPIView):
         search = self.request.query_params.get('search', '').strip()
 
         if not search:
-            return queryset
+            return queryset[:20]
 
         return queryset.filter(
             Q(name__icontains=search)
             | Q(sku__icontains=search.upper())
             | Q(barcode__icontains=search)
-        )
+        )[:20]
 
 
 class PosCartQuoteView(APIView):
@@ -85,11 +86,13 @@ class SaleViewSet(
             .order_by('-created_at')
         )
 
-        status_value = self.request.query_params.get('status')
-        customer = self.request.query_params.get('customer')
-        user = self.request.query_params.get('user')
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
+        params = validated_filters(self.request.query_params, ids=('customer', 'user'),
+                                   choices={'status': Sale.Status.values})
+        status_value = params.get('status')
+        customer = params.get('customer')
+        user = params.get('user')
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
         search = self.request.query_params.get('search', '').strip()
 
         if status_value:
@@ -148,17 +151,13 @@ class SaleViewSet(
         serializer.is_valid(raise_exception=True)
 
         try:
+            changes = dict(serializer.validated_data)
+            if 'customer_id' in changes:
+                changes['customer'] = changes.pop('customer_id')
             sale = update_pending_sale(
                 sale=self.get_object(),
                 user=request.user,
-                customer=serializer.validated_data.get('customer_id'),
-                items=serializer.validated_data['items'],
-                payment_method=serializer.validated_data.get(
-                    'payment_method',
-                    Sale.PaymentMethod.CASH,
-                ),
-                amount_paid=serializer.validated_data.get('amount_paid'),
-                notes=serializer.validated_data.get('notes', ''),
+                **changes,
             )
         except SaleConflict as exc:
             return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)

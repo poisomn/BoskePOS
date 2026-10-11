@@ -8,7 +8,7 @@ El backend es la fuente de verdad para totales, estado y stock.
 - `completed`: venta completada. Descuenta stock mediante movimientos de salida.
 - `cancelled`: venta anulada. Restaura stock mediante movimientos de entrada.
 
-El POS actual crea ventas completadas directamente para mantener compatibilidad con el flujo ya existente.
+El POS permite cobrar directamente o guardar una venta suspendida (`pending`) y completarla después. Suspender no reserva ni descuenta stock.
 
 ## Endpoints
 
@@ -17,6 +17,9 @@ Base URL: `/api/sales/sales/`
 - `GET /api/sales/sales/`
 - `POST /api/sales/sales/`
 - `GET /api/sales/sales/{id}/`
+- `PUT /api/sales/sales/{id}/`
+- `PATCH /api/sales/sales/{id}/`
+- `POST /api/sales/sales/{id}/discard/`
 - `POST /api/sales/sales/{id}/complete/`
 - `POST /api/sales/sales/{id}/cancel/`
 
@@ -46,13 +49,18 @@ Endpoints POS:
 - El cliente es opcional, pero si se informa debe existir y estar activo.
 - Cada producto debe existir y estar activo.
 - La venta debe tener al menos una linea.
-- Un producto solo puede aparecer una vez en el payload. El frontend consolida escaneos repetidos.
+- Un producto puede aparecer en varias líneas con descuentos/observaciones distintos; se valida el stock sobre la suma de sus cantidades.
 - La cantidad debe ser mayor que cero.
 - El backend recalcula `subtotal`, `discount_total`, `tax_total` y `total`.
 - La venta completada genera movimientos `exit`.
 - La anulacion genera movimientos `entry`.
 - La doble completacion o doble anulacion retorna conflicto.
 - No se permite stock negativo.
+- `PATCH` sobre una venta pendiente conserva los campos omitidos; editar solo observaciones no reemplaza los ítems.
+- La búsqueda POS devuelve hasta 20 coincidencias. El catálogo completo usa la API paginada de inventario.
+- Filtros con fechas inválidas, rangos invertidos, identificadores no positivos o estados desconocidos responden 400.
+- Los montos calculados que exceden 9.999.999.999,99 se rechazan antes de guardar.
+- El comprobante es interno. `GET /api/settings/receipt/` entrega los datos del negocio a usuarios con `sales:read`.
 
 ## Filtros
 

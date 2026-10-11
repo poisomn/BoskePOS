@@ -1,9 +1,8 @@
 from datetime import datetime, time, timedelta
 
 from django.db.models import Count, F, Q, Sum
-from django.db.models.functions import TruncDate
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -13,6 +12,7 @@ from apps.accounts.permissions import has_app_permission
 from apps.inventory.models import Product, StockMovement
 from apps.purchases.models import Purchase
 from apps.sales.models import Sale, SaleItem
+from apps.utils.query_params import optional_date
 
 
 MAX_RANGE_DAYS = 31
@@ -95,7 +95,7 @@ class DashboardSummaryView(APIView):
             )
 
         if requested_date:
-            date_from = parse_date(requested_date)
+            date_from = optional_date(requested_date, 'date')
             date_to = date_from
             if not date_from:
                 return Response(
@@ -104,8 +104,8 @@ class DashboardSummaryView(APIView):
                 )
         else:
             today = timezone.localdate()
-            date_from = parse_date(requested_from) if requested_from else today
-            date_to = parse_date(requested_to) if requested_to else date_from
+            date_from = optional_date(requested_from, 'date_from') if requested_from else today
+            date_to = optional_date(requested_to, 'date_to') if requested_to else date_from
 
             if not date_from:
                 return Response(
@@ -162,10 +162,10 @@ class DashboardSummaryView(APIView):
         return limit
 
     def _build_sales_summary(self, date_from, date_to, start_at, end_at, limit):
-        completed_sales = Sale.objects.filter(
+        completed_sales = Sale.objects.annotate(sold_at=Coalesce('completed_at', 'created_at')).filter(
             status=Sale.Status.COMPLETED,
-            created_at__gte=start_at,
-            created_at__lte=end_at,
+            sold_at__gte=start_at,
+            sold_at__lte=end_at,
         )
         totals = completed_sales.aggregate(
             total=Sum('total'),
@@ -180,7 +180,7 @@ class DashboardSummaryView(APIView):
             item['day'].isoformat(): item
             for item in (
                 completed_sales
-                .annotate(day=TruncDate('created_at', tzinfo=current_timezone))
+                .annotate(day=TruncDate('sold_at', tzinfo=current_timezone))
                 .values('day')
                 .annotate(total=Sum('total'), count=Count('id'))
                 .order_by('day')
@@ -188,10 +188,11 @@ class DashboardSummaryView(APIView):
         }
         top_products = (
             SaleItem.objects
+            .annotate(sold_at=Coalesce('sale__completed_at', 'sale__created_at'))
             .filter(
                 sale__status=Sale.Status.COMPLETED,
-                sale__created_at__gte=start_at,
-                sale__created_at__lte=end_at,
+                sold_at__gte=start_at,
+                sold_at__lte=end_at,
             )
             .values('product_id', 'product_name', 'product_sku')
             .annotate(quantity=Sum('quantity'), total=Sum('line_total'))

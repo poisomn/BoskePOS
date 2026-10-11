@@ -5,14 +5,17 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .serializers import LoginSerializer, LogoutSerializer, UserSerializer
+from .throttles import LoginThrottle, RefreshThrottle
 
 
 class LoginView(TokenObtainPairView):
+    throttle_classes = (LoginThrottle,)
     permission_classes = (AllowAny,)
     serializer_class = LoginSerializer
 
 
 class RefreshTokenView(TokenRefreshView):
+    throttle_classes = (RefreshThrottle,)
     permission_classes = (AllowAny,)
 
 

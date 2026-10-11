@@ -1,16 +1,18 @@
 from django.contrib import admin
 
+from apps.utils.admin import ReadOnlyTransactionAdminMixin
+
 from .models import Purchase, PurchaseItem
 
 
-class PurchaseItemInline(admin.TabularInline):
+class PurchaseItemInline(ReadOnlyTransactionAdminMixin, admin.TabularInline):
     model = PurchaseItem
     extra = 0
     readonly_fields = ('product_name', 'product_sku', 'line_total')
 
 
 @admin.register(Purchase)
-class PurchaseAdmin(admin.ModelAdmin):
+class PurchaseAdmin(ReadOnlyTransactionAdminMixin, admin.ModelAdmin):
     list_display = ('id', 'supplier', 'status', 'reference', 'total', 'user', 'created_at')
     list_filter = ('status', 'created_at', 'supplier')
     search_fields = ('id', 'reference', 'supplier__name', 'supplier__rut')

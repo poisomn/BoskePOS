@@ -16,14 +16,14 @@ const navItems = [
   { icon: FiSettings, label: 'Configuracion', permissions: ['settings:read'], to: '/settings/business' },
 ]
 
-function Sidebar() {
+function Sidebar({ mobile = false, onNavigate }) {
   const { user } = useAuth()
   const visibleItems = navItems.filter(
     (item) => !item.permissions || hasAnyPermission(user, item.permissions),
   )
 
   return (
-    <aside className="sidebar hidden lg:flex">
+    <aside className={mobile ? 'flex flex-col border-b bg-white lg:hidden' : 'sidebar hidden lg:flex'}>
       <div className="border-b p-4" style={{ borderColor: 'var(--color-border)' }}>
         <img
           src="/brand/LogoBoskePOS.webp"
@@ -38,6 +38,7 @@ function Sidebar() {
             end={to === '/'}
             key={to}
             to={to}
+            onClick={onNavigate}
           >
             <Icon aria-hidden="true" />
             {label}

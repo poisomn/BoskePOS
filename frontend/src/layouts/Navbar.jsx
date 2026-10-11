@@ -1,12 +1,16 @@
-import { FiLogOut, FiUser } from 'react-icons/fi'
+import { FiLogOut, FiMenu, FiUser } from 'react-icons/fi'
 
 import { useAuth } from '../hooks/useAuth'
 
-function Navbar() {
+function Navbar({ isMenuOpen, onToggleMenu }) {
   const { logout, user } = useAuth()
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-white px-4 sm:px-6 lg:px-8" style={{ borderColor: 'var(--color-border)' }}>
+      <button className="btn btn-secondary lg:hidden" type="button" aria-label="Abrir navegacion"
+        aria-expanded={isMenuOpen} aria-controls="mobile-navigation" onClick={onToggleMenu}>
+        <FiMenu aria-hidden="true" />
+      </button>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-brand-700)' }}>
           BoskePOS

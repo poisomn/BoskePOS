@@ -18,7 +18,7 @@ Actualiza parcialmente la configuracion. Requiere permiso `settings:write`.
 
 - `business_name`: nombre comercial.
 - `rut`: RUT del negocio. En v0.2 se almacena como texto; validaciones SII se
-  abordaran en v0.3.
+  requieren una futura integración tributaria validada.
 - `giro`: giro comercial.
 - `address`: direccion.
 - `city`: ciudad.
@@ -39,5 +39,9 @@ Solo `administrador` recibe estos permisos en la matriz actual.
 ## Alcance
 
 Este endpoint no implementa facturacion electronica, DTE ni SII. Su objetivo es
-preparar la parametrizacion base para v0.3 sin acoplar esos datos a componentes
+preparar la parametrizacion base sin acoplar esos datos a componentes
 frontend o servicios de venta.
+
+## Datos para comprobantes desde v0.2.1
+
+`GET /api/settings/receipt/` permite a usuarios con lectura de ventas obtener nombre, RUT, giro, dirección, ciudad, teléfono, correo, moneda y pie del comprobante. No devuelve `default_tax_rate` ni permite escritura. El vendedor puede imprimir datos del negocio sin permisos para modificar la configuración. El comprobante es interno, sin carácter tributario; la reimpresión usa la configuración vigente.

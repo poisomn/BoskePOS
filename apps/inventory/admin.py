@@ -29,6 +29,13 @@ class ProductAdmin(admin.ModelAdmin):
     )
     list_filter = ('is_active', 'category', 'brand', 'unit', 'tax_rate')
     search_fields = ('name', 'sku', 'barcode', 'brand')
+    readonly_fields = ('stock',)
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            obj.save(update_fields=(*form.changed_data, 'updated_at'))
+        else:
+            super().save_model(request, obj, form, change)
 
     @admin.display(description='Image')
     def image_preview(self, obj):

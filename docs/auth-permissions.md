@@ -11,6 +11,8 @@ BoskePOS utiliza JWT mediante `djangorestframework-simplejwt`.
 
 `logout` invalida el refresh token usando blacklist.
 
+El access token previamente emitido sigue siendo válido hasta expirar. Cerrar sesión no garantiza su revocación inmediata si fue copiado.
+
 ## Configuracion JWT
 
 - Access token: definido por `JWT_ACCESS_TOKEN_MINUTES`, por defecto 60 minutos.
@@ -65,6 +67,7 @@ Encargado de inventario (`encargado_inventario`)
 - Gestionar compras.
 - Confirmar compras.
 - No puede operar ventas.
+- No tiene acceso a clientes.
 - No puede anular compras, reservado inicialmente al administrador.
 
 ## Permisos base
@@ -105,3 +108,7 @@ Estos permisos se usan solo para adaptar la interfaz. La seguridad real se aplic
 - `403`: usuario autenticado sin autorizacion.
 
 El frontend intenta renovar access token una sola vez ante `401`. Si el refresh falla, limpia la sesion. Un `403` no cierra la sesion.
+
+## Límites desde v0.2.1
+
+Login: 10 solicitudes por minuto e IP, configurable mediante `LOGIN_THROTTLE_RATE`. Refresh: 60 por minuto e IP, mediante `REFRESH_THROTTLE_RATE`. Exceder el límite devuelve 429. La implementación usa la caché de Django; con caché local los contadores no se comparten entre procesos. Definir caché compartida y/o límite en el proxy antes de producción. Estos límites no sustituyen protección ante ataques distribuidos.
