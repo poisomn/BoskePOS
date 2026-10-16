@@ -1,0 +1,59 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
+import { cashGet, cashPost, cashPatch } from '../../services/cashService'
+import { formatMoney, formatDateTime } from '../../utils/formatters'
+import { getApiErrorMessage } from '../../utils/apiErrors'
+import FormModal from '../../components/FormModal'
+
+const methods = { cash: 'Efectivo', debit: 'Débito', credit: 'Crédito', transfer: 'Transferencia' }
+const zeroCount = { cash: '', debit: '', credit: '', transfer: '' }
+
+export default function CashPage() {
+  const { user, hasRole } = useAuth()
+  const admin = hasRole('administrador')
+  const [session, setSession] = useState(null)
+  const [registers, setRegisters] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [authorizers, setAuthorizers] = useState([])
+  const [filters, setFilters] = useState({ date_from: '', date_to: '', cashier: '', register: '' })
+  const [opening, setOpening] = useState({ register: '', opening_amount: '' })
+  const [movement, setMovement] = useState({ kind: 'withdrawal', amount: '', reason: '' })
+  const [counted, setCounted] = useState(zeroCount)
+  const [notes, setNotes] = useState('')
+  const [adminId, setAdminId] = useState('')
+  const [pin, setPin] = useState('')
+  const [events, setEvents] = useState([])
+  const [detail, setDetail] = useState(null)
+  const [registerName, setRegisterName] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const reload = useCallback(async () => {
+    const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value))
+    const [current, boxes, history, approvers] = await Promise.all([cashGet('sessions/current'), cashGet('registers'), cashGet('sessions', params), cashGet('sessions/authorizers')])
+    setSession(current); setRegisters(boxes); setSessions(history.results || history); setAuthorizers(approvers)
+    setEvents(current ? await cashGet(`sessions/${current.id}/movements`) : [])
+  }, [filters])
+  useEffect(() => { queueMicrotask(() => reload().catch(e => setError(getApiErrorMessage(e)))) }, [reload])
+  async function run(action, success) {
+    setBusy(true); setError(''); setMessage('')
+    try { await action(); await reload(); setMessage(success) } catch (e) { setError(getApiErrorMessage(e)) } finally { setBusy(false) }
+  }
+  const closed = sessions.filter(item => item.closed_at)
+  const differences = closed.map(item => Number(item.summary.differences?.cash || 0))
+  return <div className="space-y-5">
+    <section className="surface p-5 flex flex-wrap justify-between gap-3"><div><p className="section-note">Control de turnos</p><h1 className="text-2xl font-semibold">Cajas y cuadraturas</h1><p className="section-note">{user.email}</p></div><div className="flex gap-2"><Link to="/pos" className="btn btn-primary">Ir al POS</Link>{admin && <Link to="/settings/users" className="btn btn-secondary">Usuarios y PIN</Link>}</div></section>
+    {error && <div role="alert" className="alert alert-error">{error}</div>}{message && <div role="status" className="alert alert-success">{message}</div>}
+    {!session ? <form className="surface p-5 space-y-4 max-w-xl" onSubmit={e => { e.preventDefault(); run(() => cashPost('sessions/open', opening), 'Turno abierto. Ya puedes cobrar.'); }}><h2 className="section-title">Apertura de caja</h2><label className="block"><span className="field-label">Caja</span><select required className="select" value={opening.register} onChange={e => setOpening({ ...opening, register: e.target.value })}><option value="">Selecciona una caja</option>{registers.filter(box => box.is_active).map(box => <option value={box.id} key={box.id}>{box.name}</option>)}</select></label><label className="block"><span className="field-label">Fondo inicial contado</span><input className="input" required type="number" min="0" step="1" value={opening.opening_amount} onChange={e => setOpening({ ...opening, opening_amount: e.target.value })} /></label><button className="btn btn-primary" disabled={busy}>Abrir turno</button></form> : <>
+      <section className="surface p-5"><div className="flex flex-wrap justify-between gap-3"><div><span className="badge badge-success">Abierta</span><h2 className="text-xl font-semibold mt-2">{session.register_name} · Turno #{session.id}</h2><p className="section-note">Desde {formatDateTime(session.opened_at)} · Fondo {formatMoney(session.opening_amount)}</p></div><button className="btn btn-danger" onClick={() => { setClosing(true); setCounted(zeroCount); setNotes(''); setPin(''); setError('') }}>Cerrar caja</button></div><div className="grid sm:grid-cols-4 gap-3 mt-5">{Object.entries(methods).map(([key, label]) => <div className="rounded-lg border p-3" key={key}><p className="section-note">{label} esperado</p><strong>{formatMoney(session.summary.expected[key])}</strong></div>)}</div></section>
+      <form className="surface p-5 space-y-3" onSubmit={e => { e.preventDefault(); run(async () => { await cashPost(`sessions/${session.id}/movements`, movement); setMovement({ kind: 'withdrawal', amount: '', reason: '' }) }, 'Movimiento registrado.') }}><h2 className="section-title">Movimiento de efectivo</h2><div className="grid sm:grid-cols-3 gap-3"><label><span className="field-label">Tipo</span><select className="select" value={movement.kind} onChange={e => setMovement({ ...movement, kind: e.target.value })}><option value="withdrawal">Retiro</option><option value="entry">Ingreso adicional</option></select></label><label><span className="field-label">Monto</span><input className="input" type="number" step="1" min="1" required value={movement.amount} onChange={e => setMovement({ ...movement, amount: e.target.value })} /></label><label><span className="field-label">Motivo</span><input className="input" maxLength={500} required value={movement.reason} onChange={e => setMovement({ ...movement, reason: e.target.value })} /></label></div><button className="btn btn-secondary" disabled={busy}>Registrar movimiento</button></form>
+      <section className="surface p-5 overflow-auto"><h2 className="section-title mb-3">Movimientos del turno</h2><table className="data-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th>Monto</th><th>Motivo</th><th>Responsable</th></tr></thead><tbody>{events.map(item => <tr key={item.id}><td>{formatDateTime(item.created_at)}</td><td>{{ sale: 'Venta', refund: 'Anulación', entry: 'Ingreso', withdrawal: 'Retiro' }[item.kind]}</td><td>{methods[item.method]}</td><td>{formatMoney(item.amount)}</td><td>{item.reason}</td><td>{item.user_email}</td></tr>)}</tbody></table></section>
+    </>}
+    {admin && <section className="surface p-5 space-y-3"><h2 className="section-title">Configuración de cajas</h2><form className="flex gap-2" onSubmit={e => { e.preventDefault(); run(async () => { await cashPost('registers', { name: registerName }); setRegisterName('') }, 'Caja creada.') }}><input className="input" aria-label="Nombre de nueva caja" placeholder="Nombre de nueva caja" required maxLength={100} value={registerName} onChange={e => setRegisterName(e.target.value)} /><button className="btn btn-secondary" disabled={busy}>Agregar caja</button></form>{registers.map(box => <div key={box.id} className="flex items-center justify-between gap-3"><span>{box.name} · {box.is_active ? 'Activa' : 'Inactiva'}</span><button className="btn btn-secondary" disabled={busy} onClick={() => run(() => cashPatch(`registers/${box.id}`, { is_active: !box.is_active }), 'Estado de caja actualizado.')}>{box.is_active ? 'Desactivar' : 'Activar'}</button></div>)}</section>}
+    <section className="surface p-5 space-y-4"><h2 className="section-title">Historial de sesiones</h2><div className="grid sm:grid-cols-4 gap-3">{[['date_from', 'Desde', 'date'], ['date_to', 'Hasta', 'date'], ['cashier', 'ID cajero', 'number'], ['register', 'ID caja', 'number']].map(([key, label, type]) => <label key={key}><span className="field-label">{label}</span><input className="input" type={type} min={type === 'number' ? 1 : undefined} value={filters[key]} onChange={e => setFilters({ ...filters, [key]: e.target.value })} /></label>)}</div><p className="text-sm">Diferencia de efectivo: <strong>{formatMoney(differences.reduce((sum, n) => sum + n, 0))}</strong> · Faltantes: {formatMoney(-differences.filter(n => n < 0).reduce((s, n) => s + n, 0))} · Sobrantes: {formatMoney(differences.filter(n => n > 0).reduce((s, n) => s + n, 0))}</p><div className="overflow-auto"><table className="data-table"><thead><tr><th>Turno / caja</th><th>Cajero</th><th>Apertura</th><th>Cierre</th><th>Diferencia efectivo</th><th>Detalle</th></tr></thead><tbody>{sessions.map(item => <tr key={item.id}><td>#{item.id} · {item.register_name}</td><td>{item.cashier_email}</td><td>{formatDateTime(item.opened_at)}</td><td>{formatDateTime(item.closed_at)}</td><td>{item.closed_at ? formatMoney(item.summary.differences.cash) : 'Turno abierto'}</td><td><button className="btn btn-secondary" onClick={() => setDetail(item)}>Ver</button></td></tr>)}</tbody></table></div></section>
+    <FormModal isOpen={closing} title="Cierre y arqueo" onClose={() => !busy && setClosing(false)}>{error && <div className="alert alert-error" role="alert">{error}</div>}<form className="space-y-4" onSubmit={e => { e.preventDefault(); run(async () => { await cashPost(`sessions/${session.id}/close`, { counted, notes, admin_id: Number(adminId), pin }); setClosing(false); setPin('') }, 'Caja cerrada. El informe quedó guardado.') }}><p className="section-note">Cuenta el efectivo y contrasta los otros medios con sus comprobantes.</p>{Object.entries(methods).map(([key, label]) => <label className="block" key={key}><span className="field-label">{label} contado / contrastado</span><input className="input" required min={key === 'cash' ? '0' : undefined} step={key === 'cash' ? '1' : '0.01'} type="number" value={counted[key]} onChange={e => setCounted({ ...counted, [key]: e.target.value })} /></label>)}<label className="block"><span className="field-label">Observación (obligatoria si hay diferencia)</span><textarea className="textarea" maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} /></label><label className="block"><span className="field-label">Administrador que autoriza</span><select className="select" required value={adminId} onChange={e => setAdminId(e.target.value)}><option value="">Selecciona administrador</option>{authorizers.map(item => <option key={item.id} value={item.id}>{item.email}</option>)}</select></label>{!authorizers.length && <p role="alert">Un administrador debe configurar su PIN en Usuarios antes de cerrar.</p>}<label className="block"><span className="field-label">PIN de 4 dígitos</span><input className="input" required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} /></label><button className="btn btn-primary" disabled={busy}>Confirmar cierre</button></form></FormModal>
+    <FormModal isOpen={!!detail} title={`Turno #${detail?.id}`} onClose={() => setDetail(null)}>{detail && <div className="space-y-3"><p>{detail.register_name} · {detail.cashier_email}</p>{Object.entries(methods).map(([key, label]) => <div className="border-b pb-2" key={key}><strong>{label}</strong><p>Esperado: {formatMoney(detail.summary.expected[key])}{detail.closed_at && <> · Contado: {formatMoney(detail.summary.counted[key])} · Diferencia: {formatMoney(detail.summary.differences[key])}</>}</p></div>)}<p>Conteo: {detail.counted_by_email || 'Pendiente'}</p><p>Autorización: {detail.authorized_by_email || 'Pendiente'}</p><p>{detail.closing_notes}</p></div>}</FormModal>
+  </div>
+}

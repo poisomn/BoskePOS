@@ -1,30 +1,27 @@
 import { Outlet } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
 
 function AuthLayout() {
   return (
     <main className="app-shell grid min-h-svh lg:grid-cols-[1fr_480px]">
       <section className="hidden border-r bg-white lg:flex lg:flex-col lg:justify-between" style={{ borderColor: 'var(--color-border)' }}>
         <div className="p-10">
-          <img
-            src="/brand/LogoBoskePOS.webp"
-            alt="BoskePOS"
-            className="h-28 w-auto object-contain"
-          />
+          <BrandLogo className="w-full max-w-sm" />
           <div className="mt-12 max-w-xl">
             <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-brand-700)' }}>
               ERP/POS comercial
             </p>
             <h1 className="mt-3 text-4xl font-semibold leading-tight">
-              Operacion rapida para ferreterias chilenas.
+              Tu ferretería, conectada.
             </h1>
             <p className="mt-4 text-base" style={{ color: 'var(--color-text-muted)' }}>
-              Acceso seguro para cajeros y vendedores. La interfaz esta preparada para
-              trabajar con rapidez desde el meson.
+              Ventas, inventario y clientes en un mismo lugar.
+              Todo lo que necesitas para atender mejor desde el mesón.
             </p>
           </div>
         </div>
         <div className="p-10 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          BoskePOS v0.1
+          BoskePOS · Gestión para tu ferretería
         </div>
       </section>
 

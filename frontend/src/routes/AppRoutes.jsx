@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import Mascot from '../components/Mascot'
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
 import AccessDeniedPage from '../pages/Auth/AccessDeniedPage'
@@ -8,7 +9,10 @@ import CustomersPage from '../pages/Customers/CustomersPage'
 import CategoriesPage from '../pages/Inventory/CategoriesPage'
 import ProductsPage from '../pages/Inventory/ProductsPage'
 import LoginPage from '../pages/Login/LoginPage'
-import POSPage from '../pages/POS/POSPage'
+import POSPage from '../pages/POS/POSOperationsPage'
+import CashPage from '../pages/Cash/CashPage'
+import UsersPage from '../pages/Settings/UsersPage'
+import OperationsPage from '../pages/Reports/OperationsPage'
 import PurchaseDetailPage from '../pages/Purchases/PurchaseDetailPage'
 import PurchasesPage from '../pages/Purchases/PurchasesPage'
 import SaleDetailPage from '../pages/Sales/SaleDetailPage'
@@ -22,7 +26,7 @@ const BklitSmokeTestPage = import.meta.env.DEV
   ? lazy(() => import('../pages/Dev/BklitSmokeTestPage'))
   : null
 const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'))
-const routeFallback = <div className="surface p-5">Cargando modulo...</div>
+const routeFallback = <div className="surface p-5 state-message" role="status"><Mascot state="cargando" size={64} />Cargando módulo…</div>
 
 function AppRoutes() {
   return (
@@ -55,9 +59,11 @@ function AppRoutes() {
 
           <Route element={<RequirePermission permissions={['sales:complete']} />}>
             <Route path="/pos" element={<POSPage />} />
+            <Route path="/cash" element={<CashPage />} />
           </Route>
           <Route element={<RequirePermission permissions={['sales:read']} />}>
             <Route path="/sales" element={<SalesHistoryPage />} />
+            <Route path="/reports" element={<OperationsPage />} />
             <Route path="/sales/:saleId" element={<SaleDetailPage />} />
           </Route>
           <Route element={<RequirePermission permissions={['purchases:read']} />}>
@@ -76,6 +82,7 @@ function AppRoutes() {
           </Route>
           <Route element={<RequirePermission permissions={['settings:read']} />}>
             <Route path="/settings/business" element={<BusinessSettingsPage />} />
+            <Route path="/settings/users" element={<UsersPage />} />
           </Route>
         </Route>
       </Route>

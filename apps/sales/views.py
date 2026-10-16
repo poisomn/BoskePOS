@@ -9,6 +9,7 @@ from apps.accounts.permissions import SalePermission
 from apps.inventory.models import Product
 from apps.utils.query_params import validated_filters
 
+from apps.cash.services import verify_admin_pin
 from .models import Sale
 from .serializers import (
     PosCartQuoteInputSerializer,
@@ -129,7 +130,12 @@ class SaleViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        values = serializer.validated_data
+        authorizer = verify_admin_pin(values['admin_id'], values.get('pin', '')) if values.get('admin_id') else None
         sale = register_sale(
+            idempotency_key=values.get('idempotency_key'),
+            discount_reason=values.get('discount_reason', ''),
+            authorizer=authorizer,
             user=request.user,
             customer=serializer.validated_data.get('customer_id'),
             items=serializer.validated_data['items'],
@@ -152,6 +158,9 @@ class SaleViewSet(
 
         try:
             changes = dict(serializer.validated_data)
+            admin_id = changes.pop('admin_id', None)
+            pin = changes.pop('pin', '')
+            changes['authorizer'] = verify_admin_pin(admin_id, pin) if admin_id else None
             if 'customer_id' in changes:
                 changes['customer'] = changes.pop('customer_id')
             sale = update_pending_sale(
@@ -170,7 +179,11 @@ class SaleViewSet(
         serializer.is_valid(raise_exception=True)
 
         try:
+            values = serializer.validated_data
+            authorizer = verify_admin_pin(values['admin_id'], values.get('pin', '')) if values.get('admin_id') else None
             sale = complete_sale(
+                idempotency_key=values.get('idempotency_key'),
+                authorizer=authorizer,
                 sale=self.get_object(),
                 user=request.user,
                 payment_method=serializer.validated_data.get(

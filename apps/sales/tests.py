@@ -22,6 +22,8 @@ class PosApiTests(APITestCase):
         )
         self.user.groups.add(Group.objects.get(name=ADMIN_ROLE))
         self.client.force_authenticate(user=self.user)
+        from apps.cash.models import CashRegister, CashSession
+        CashSession.objects.create(register=CashRegister.objects.create(name='Test till'), cashier=self.user, opening_amount=0)
         self.hammer = Product.objects.create(
             name='Martillo carpintero',
             sku='FER-001',
@@ -215,6 +217,7 @@ class PosApiTests(APITestCase):
                 'payment_method': Sale.PaymentMethod.CASH,
                 'amount_paid': '10000.00',
                 'notes': 'Venta con descuento autorizado',
+                'discount_reason': 'Descuento autorizado de mesón',
                 'items': [
                     {
                         'product_id': self.hammer.id,
@@ -315,6 +318,7 @@ class PosApiTests(APITestCase):
                     },
                 ],
                 'notes': 'Venta suspendida',
+                'discount_reason': 'Descuento de mesón',
             },
             format='json',
         )

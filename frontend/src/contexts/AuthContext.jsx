@@ -8,6 +8,7 @@ import {
 import { clearTokens, getRefreshToken, setTokens } from '../utils/tokenStorage'
 import { hasAnyPermission, hasPermission, hasRole } from '../utils/permissions'
 import { AuthContext } from './authContextValue'
+import { mascotController } from '../lib/mascotController'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -17,6 +18,8 @@ export function AuthProvider({ children }) {
   const clearSession = useCallback(() => {
     clearTokens()
     setUser(null)
+    mascotController.reset()
+    mascotController.active()
   }, [])
 
   useEffect(() => {
@@ -65,6 +68,7 @@ export function AuthProvider({ children }) {
       const authData = await loginRequest({ email, password })
       setTokens({ access: authData.access, refresh: authData.refresh })
       setUser(authData.user)
+      mascotController.react('login')
       return authData.user
     } finally {
       setIsSubmitting(false)

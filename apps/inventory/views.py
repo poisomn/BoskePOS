@@ -1,5 +1,5 @@
 from django.db.models import F, ProtectedError, Q
-from rest_framework import filters, status, viewsets
+from rest_framework import filters, status, viewsets, serializers
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -82,6 +82,25 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
+    @action(detail=True, methods=('get',), url_path='monthly-activity')
+    def monthly_activity(self, request, pk=None):
+        from datetime import date
+        from decimal import Decimal
+        from django.utils import timezone
+        from django.db.models import Sum
+        from django.db.models.functions import TruncMonth
+        from apps.purchases.models import PurchaseItem
+        from apps.sales.models import SaleItem
+        product = self.get_object()
+        year_field = serializers.IntegerField(min_value=2000, max_value=2100)
+        year = year_field.run_validation(request.query_params.get('year', timezone.localdate().year))
+        zone = timezone.get_current_timezone()
+        sales = SaleItem.objects.filter(product=product, sale__status='completed', sale__completed_at__year=year).annotate(month=TruncMonth('sale__completed_at', tzinfo=zone)).values('month').annotate(quantity=Sum('quantity'), total=Sum('line_total'))
+        purchases = PurchaseItem.objects.filter(product=product, purchase__status='confirmed', purchase__confirmed_at__year=year).annotate(month=TruncMonth('purchase__confirmed_at', tzinfo=zone)).values('month').annotate(quantity=Sum('quantity'))
+        sold = {row['month'].month: row for row in sales}
+        bought = {row['month'].month: row for row in purchases}
+        return Response({'product': product.pk, 'name': product.name, 'stock': product.stock, 'minimum_stock': product.minimum_stock, 'year': year, 'months': [{'month': date(year, month, 1).isoformat(), 'purchased_quantity': bought.get(month, {}).get('quantity', 0), 'sold_quantity': sold.get(month, {}).get('quantity', 0), 'sales_total': str(sold.get(month, {}).get('total', Decimal('0')))} for month in range(1, 13)]})
+
     queryset = Product.objects.select_related('category')
     serializer_class = ProductSerializer
     pagination_class = StandardPageNumberPagination

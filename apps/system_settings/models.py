@@ -5,6 +5,7 @@ from django.db import models
 
 
 class BusinessSettings(models.Model):
+    seller_discount_limit = models.PositiveSmallIntegerField(default=5)
     business_name = models.CharField(max_length=180, default='BoskePOS')
     rut = models.CharField(max_length=20, blank=True, default='')
     giro = models.CharField(max_length=180, blank=True, default='')

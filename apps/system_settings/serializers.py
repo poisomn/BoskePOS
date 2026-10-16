@@ -12,10 +12,12 @@ class ReceiptSettingsSerializer(serializers.ModelSerializer):
 
 
 class BusinessSettingsSerializer(serializers.ModelSerializer):
+    seller_discount_limit = serializers.IntegerField(min_value=0, max_value=100, required=False)
     class Meta:
         model = BusinessSettings
         fields = (
             'business_name',
+            'seller_discount_limit',
             'rut',
             'giro',
             'address',

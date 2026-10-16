@@ -1,3 +1,4 @@
+import Mascot from './Mascot'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 
 function DataTable({
@@ -33,7 +34,7 @@ function DataTable({
           ) : (
             <tr>
               <td className="text-center" colSpan={columns.length}>
-                <span style={{ color: 'var(--color-text-muted)' }}>{emptyMessage}</span>
+                <div className="empty-state"><Mascot state="inactivo" size={72} /><span style={{ color: 'var(--color-text-muted)' }}>{emptyMessage}</span></div>
               </td>
             </tr>
           )}
@@ -46,6 +47,7 @@ function DataTable({
         </p>
         <div className="flex gap-2">
           <button
+            aria-label="Página anterior"
             className="icon-btn"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
@@ -54,6 +56,7 @@ function DataTable({
             <FiChevronLeft aria-hidden="true" />
           </button>
           <button
+            aria-label="Página siguiente"
             className="icon-btn"
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}

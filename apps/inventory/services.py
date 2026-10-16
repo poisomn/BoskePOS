@@ -24,6 +24,8 @@ INCREASE_TYPES = {
 }
 
 DECREASE_TYPES = {
+    StockMovement.MovementType.INTERNAL_USE,
+    StockMovement.MovementType.WASTE,
     StockMovement.MovementType.EXIT,
     StockMovement.MovementType.NEGATIVE_ADJUSTMENT,
 }

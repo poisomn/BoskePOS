@@ -6,6 +6,7 @@ from .models import Sale, SaleItem
 
 
 class PosProductSerializer(serializers.Serializer):
+    tax_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
     id = serializers.IntegerField()
     name = serializers.CharField()
     sku = serializers.CharField()
@@ -15,6 +16,7 @@ class PosProductSerializer(serializers.Serializer):
 
 
 class PosCartItemInputSerializer(serializers.Serializer):
+    discount_percent = serializers.IntegerField(min_value=0, max_value=100, required=False)
     line_id = serializers.CharField(required=False, allow_blank=True, max_length=64)
     product_id = serializers.IntegerField(min_value=1)
     quantity = serializers.IntegerField(min_value=1)
@@ -26,12 +28,21 @@ class PosCartItemInputSerializer(serializers.Serializer):
     )
     note = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
+    def validate(self, attrs):
+        if attrs.get('discount_percent') and attrs.get('discount_amount'):
+            raise serializers.ValidationError('Usa descuento en porcentaje o monto, no ambos.')
+        return attrs
+
 
 class PosCartQuoteInputSerializer(serializers.Serializer):
     items = PosCartItemInputSerializer(many=True, allow_empty=True)
 
 
 class SaleCreateSerializer(serializers.Serializer):
+    idempotency_key = serializers.UUIDField(required=False)
+    discount_reason = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+    admin_id = serializers.IntegerField(min_value=1, required=False, write_only=True)
+    pin = serializers.RegexField(r'^[0-9]{4}$', required=False, write_only=True)
     customer_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     items = PosCartItemInputSerializer(many=True, allow_empty=False)
     status = serializers.ChoiceField(
@@ -67,6 +78,9 @@ class SaleUpdateSerializer(SaleCreateSerializer):
 
 
 class SaleCompleteSerializer(serializers.Serializer):
+    idempotency_key = serializers.UUIDField(required=False)
+    admin_id = serializers.IntegerField(min_value=1, required=False, write_only=True)
+    pin = serializers.RegexField(r'^[0-9]{4}$', required=False, write_only=True)
     payment_method = serializers.ChoiceField(
         choices=Sale.PaymentMethod.choices,
         default=Sale.PaymentMethod.CASH,
@@ -91,6 +105,9 @@ class SaleItemSerializer(serializers.ModelSerializer):
             'product_sku',
             'quantity',
             'unit_price',
+            'rounding_adjustment',
+            'tax_rate',
+            'discount_percent',
             'discount_total',
             'tax_total',
             'line_total',
@@ -100,6 +117,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 
 class SaleSerializer(serializers.ModelSerializer):
+    cashier_email = serializers.CharField(source='cashier.email', read_only=True, allow_null=True)
     items = SaleItemSerializer(many=True, read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True, allow_null=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
@@ -114,9 +132,15 @@ class SaleSerializer(serializers.ModelSerializer):
             'customer_name',
             'user',
             'user_email',
+            'cashier',
+            'cashier_email',
+            'cash_session',
+            'discount_reason',
+            'discount_authorized_by',
             'status',
             'status_label',
             'subtotal',
+            'rounding_adjustment',
             'discount_total',
             'tax_total',
             'total',

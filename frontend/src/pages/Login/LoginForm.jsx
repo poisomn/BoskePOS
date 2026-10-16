@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiLock, FiMail } from 'react-icons/fi'
+import { mascotController } from '../../lib/mascotController'
 
 function LoginForm({ error, isSubmitting, onSubmit }) {
   const [email, setEmail] = useState('')
@@ -11,7 +12,9 @@ function LoginForm({ error, isSubmitting, onSubmit }) {
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit} onFocusCapture={event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) mascotController.react('login')
+    }}>
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <label>

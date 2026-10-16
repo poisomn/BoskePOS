@@ -167,6 +167,7 @@ class InventoryPermission(ActionPermission):
         'list': 'inventory:read',
         'retrieve': 'inventory:read',
         'by_barcode': 'inventory:read',
+        'monthly_activity': 'stock_movements:read',
         'create': 'inventory:write',
         'update': 'inventory:write',
         'partial_update': 'inventory:write',

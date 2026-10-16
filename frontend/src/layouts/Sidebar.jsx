@@ -1,52 +1,28 @@
 import { NavLink } from 'react-router-dom'
-import { FiBarChart2, FiGrid, FiHome, FiPackage, FiSettings, FiShoppingBag, FiShoppingCart, FiTruck, FiUsers } from 'react-icons/fi'
-
+import BrandLogo from '../components/BrandLogo'
 import { useAuth } from '../hooks/useAuth'
 import { hasAnyPermission } from '../utils/permissions'
-
-const navItems = [
-  { icon: FiHome, label: 'Dashboard', to: '/' },
-  { icon: FiShoppingCart, label: 'POS', permissions: ['sales:complete'], to: '/pos' },
-  { icon: FiBarChart2, label: 'Ventas', permissions: ['sales:read'], to: '/sales' },
-  { icon: FiShoppingBag, label: 'Compras', permissions: ['purchases:read'], to: '/purchases' },
-  { icon: FiUsers, label: 'Clientes', permissions: ['customers:read'], to: '/customers' },
-  { icon: FiTruck, label: 'Proveedores', permissions: ['suppliers:read'], to: '/suppliers' },
-  { icon: FiPackage, label: 'Productos', permissions: ['inventory:read'], to: '/inventory/products' },
-  { icon: FiGrid, label: 'Categorias', permissions: ['inventory:read'], to: '/inventory/categories' },
-  { icon: FiSettings, label: 'Configuracion', permissions: ['settings:read'], to: '/settings/business' },
-]
+import { navItems } from './navigation'
 
 function Sidebar({ mobile = false, onNavigate }) {
   const { user } = useAuth()
-  const visibleItems = navItems.filter(
-    (item) => !item.permissions || hasAnyPermission(user, item.permissions),
-  )
-
+  const visibleItems = navItems.filter((item) => !item.permissions || hasAnyPermission(user, item.permissions))
+  const groups = [...new Set(visibleItems.map((item) => item.group))]
   return (
-    <aside className={mobile ? 'flex flex-col border-b bg-white lg:hidden' : 'sidebar hidden lg:flex'}>
-      <div className="border-b p-4" style={{ borderColor: 'var(--color-border)' }}>
-        <img
-          src="/brand/LogoBoskePOS.webp"
-          alt="BoskePOS"
-          className="h-14 w-auto object-contain"
-        />
-      </div>
-      <nav className="flex flex-1 flex-col gap-1 p-3">
-        {visibleItems.map(({ icon: Icon, label, to }) => (
-          <NavLink
-            className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
-            end={to === '/'}
-            key={to}
-            to={to}
-            onClick={onNavigate}
-          >
-            <Icon aria-hidden="true" />
-            {label}
-          </NavLink>
-        ))}
+    <aside className={mobile ? 'sidebar sidebar-mobile' : 'sidebar hidden lg:flex'}>
+      <div className="sidebar-brand"><BrandLogo linked /></div>
+      <nav className="sidebar-navigation" aria-label="Navegación principal">
+        {groups.map((group) => <div key={group} className="nav-group">
+          <p className="nav-group-label">{group}</p>
+          {visibleItems.filter((item) => item.group === group).map(({ icon: Icon, label, to }) => (
+            <NavLink className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`} end={to === '/'} key={to} to={to} onClick={onNavigate}>
+              <Icon aria-hidden="true" /><span>{label}</span>
+            </NavLink>
+          ))}
+        </div>)}
       </nav>
+      <div className="sidebar-footer"><span className="brand-dot" /> BoskePOS <span>Gestión para tu ferretería</span></div>
     </aside>
   )
 }
-
 export default Sidebar

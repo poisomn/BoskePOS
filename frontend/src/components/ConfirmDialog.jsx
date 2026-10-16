@@ -1,3 +1,5 @@
+import FormModal from './FormModal'
+
 function ConfirmDialog({
   confirmLabel = 'Eliminar',
   description,
@@ -14,9 +16,7 @@ function ConfirmDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <section className="modal-panel">
-        <h2 className="text-lg font-semibold">{title}</h2>
+    <FormModal isOpen={isOpen} title={title} onClose={() => { if (!isSubmitting) onCancel() }}>
         <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
           {description}
         </p>
@@ -33,8 +33,7 @@ function ConfirmDialog({
             {isSubmitting ? loadingLabel : confirmLabel}
           </button>
         </div>
-      </section>
-    </div>
+    </FormModal>
   )
 }
 

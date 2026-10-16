@@ -2,6 +2,14 @@ from django.db import models
 
 
 class Sale(models.Model):
+    rounding_adjustment = models.DecimalField(max_digits=4, decimal_places=2, default=0)
+    cashier = models.ForeignKey('accounts.User', null=True, blank=True, related_name='collected_sales', on_delete=models.PROTECT)
+    cash_session = models.ForeignKey('cash.CashSession', null=True, blank=True, on_delete=models.PROTECT)
+    idempotency_key = models.UUIDField(null=True, blank=True)
+    completion_key = models.UUIDField(null=True, blank=True)
+    request_fingerprint = models.CharField(max_length=64, blank=True, default='')
+    discount_reason = models.CharField(max_length=500, blank=True, default='')
+    discount_authorized_by = models.ForeignKey('accounts.User', null=True, blank=True, related_name='+', on_delete=models.PROTECT)
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pendiente'
         COMPLETED = 'completed', 'Completada'
@@ -48,12 +56,20 @@ class Sale(models.Model):
 
     class Meta:
         ordering = ('-created_at',)
+        constraints = [
+            models.UniqueConstraint(fields=('user', 'idempotency_key'), name='sale_actor_idempotency'),
+            models.UniqueConstraint(fields=('cashier', 'completion_key'), name='sale_cashier_completion'),
+        ]
 
     def __str__(self):
         return f'Sale #{self.id}'
 
 
 class SaleItem(models.Model):
+    rounding_adjustment = models.DecimalField(max_digits=4, decimal_places=2, default=0)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     sale = models.ForeignKey(Sale, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(
         'inventory.Product',

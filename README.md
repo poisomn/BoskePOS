@@ -1,17 +1,16 @@
 # BoskePOS
 
+## Avance de POS caja y stock
+
+Implementación local de POS con alta de cliente, descuentos porcentuales autorizados, sesiones de caja y PIN de administrador, movimientos de stock y primera vista de gestión. Migraciones aplicadas localmente; pendiente aceptación del negocio. Alcance, reglas de dinero, pruebas y uso: [avance operativo](docs/avance-operativo-pos-caja.md). Roadmap de la entrevista: [plan por sprints](docs/plan-mvp-entrevista-dabed-2026-10-15.md).
+
 BoskePOS es un ERP/POS para ferreterias chilenas construido con Django, Django REST Framework, PostgreSQL, React, Vite y Tailwind CSS.
 
 El proyecto parte del MVP v0.2 y contiene una revisión de estabilización **v0.2.1**, validada localmente. La lógica de negocio vive en el backend; el frontend consume la API REST. Esta revisión no representa una puesta en producción ni una certificación tributaria.
 
-## Auditoría y Proyecto de Título
+## Documentación del proyecto
 
-- [Documento Word de auditoría y plan académico](output/docx/BoskePOS_Auditoria_y_Plan_Proyecto_de_Titulo.docx)
-- [Resultados y cambios realizados](docs/auditoria-mvp-v0.2.1.md)
 - [Plan de versiones y criterios de aceptación](docs/roadmap-mvp.md)
-- [Revisión del informe académico](docs/proyecto-titulo/revision-informe.md)
-- [Trazabilidad de requerimientos](docs/proyecto-titulo/trazabilidad.md)
-- [Plan de validación con usuarios](docs/proyecto-titulo/plan-validacion.md)
 - [Arquitectura y modelo de datos](docs/architecture.md)
 
 ## Demostración aislada en Windows
@@ -194,7 +193,7 @@ No incluye:
 - Multiples bodegas o sucursales.
 - Roles avanzados.
 - Reportes BI.
-- Cierre de caja y conciliación de pagos.
+- Conciliación automática con terminales bancarios (la conciliación de caja incorporada es manual).
 - Cantidades fraccionarias (stock y cantidades son enteros).
 - Importación y exportación masiva de catálogo.
 - Validación de SLA productivos y piloto con usuarios reales.

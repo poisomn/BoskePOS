@@ -170,6 +170,8 @@ class DashboardSummaryView(APIView):
         totals = completed_sales.aggregate(
             total=Sum('total'),
             count=Count('id'),
+            identified_customers=Count('customer', distinct=True),
+            anonymous_transactions=Count('id', filter=Q(customer__isnull=True)),
         )
         recent_sales = (
             Sale.objects.select_related('customer', 'user')
@@ -202,6 +204,9 @@ class DashboardSummaryView(APIView):
         return {
             'total': format_decimal(totals['total']),
             'count': totals['count'],
+            'identified_customers': totals['identified_customers'],
+            'anonymous_transactions': totals['anonymous_transactions'],
+            'average_ticket': format_decimal(totals['total'] / totals['count']) if totals['count'] else None,
             'daily': [
                 {
                     'date': current_date.isoformat(),

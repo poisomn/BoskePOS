@@ -102,6 +102,8 @@ class StockMovement(models.Model):
     class MovementType(models.TextChoices):
         ENTRY = 'entry', 'Entrada'
         EXIT = 'exit', 'Salida'
+        INTERNAL_USE = 'internal_use', 'Retiro interno'
+        WASTE = 'waste', 'Merma o daño'
         POSITIVE_ADJUSTMENT = 'positive_adjustment', 'Ajuste positivo'
         NEGATIVE_ADJUSTMENT = 'negative_adjustment', 'Ajuste negativo'
 

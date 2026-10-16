@@ -18,21 +18,25 @@ import {
   updateProduct,
 } from '../../services/inventoryService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
-import { formatDateTime, formatMoney } from '../../utils/formatters'
+import { formatDateTime, formatMoney, formatPercent } from '../../utils/formatters'
 import InventoryHeader from './InventoryHeader'
 import ProductForm from './ProductForm'
+import MonthlyActivity from './MonthlyActivity'
 
 const PAGE_SIZE = 8
 const MOVEMENT_PAGE_SIZE = 8
 const MOVEMENT_TYPES = [
   { label: 'Entrada', value: 'entry' },
   { label: 'Salida', value: 'exit' },
+  { label: 'Retiro interno / uso del dueño', value: 'internal_use' },
+  { label: 'Merma o daño', value: 'waste' },
   { label: 'Ajuste positivo', value: 'positive_adjustment' },
   { label: 'Ajuste negativo', value: 'negative_adjustment' },
 ]
-const DECREASE_MOVEMENTS = new Set(['exit', 'negative_adjustment'])
+const DECREASE_MOVEMENTS = new Set(['exit', 'negative_adjustment', 'internal_use', 'waste'])
 
 function ProductsPage() {
+  const [activity, setActivity] = useState(null)
   const { hasPermission } = useAuth()
   const canAdjustStock = hasPermission('inventory:adjust_stock')
   const canViewCosts = hasPermission('inventory:view_costs')
@@ -336,6 +340,7 @@ function ProductsPage() {
         movement_type: adjustmentForm.movement_type,
         quantity,
         reason: adjustmentForm.reason.trim(),
+        reference: adjustmentForm.reference || '',
       })
       setSuccessMessage(`Stock actualizado. Nuevo saldo: ${movement.stock_after}.`)
       setProductToAdjust(null)
@@ -379,9 +384,7 @@ function ProductsPage() {
             </div>
           )}
           <div>
-            <p className="font-semibold" style={{ color: 'var(--color-text)' }}>
-              {product.name}
-            </p>
+            {canViewMovements ? <button className="text-left font-semibold underline decoration-dotted" onClick={() => setActivity(product)}>{product.name}</button> : <p className="font-semibold">{product.name}</p>}
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
               {product.brand || 'Sin marca'}
             </p>
@@ -448,7 +451,7 @@ function ProductsPage() {
         <div>
           <p className="font-semibold">{formatMoney(product.sale_price)}</p>
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            IVA {product.tax_rate ?? '19.00'}%
+            IVA {formatPercent(product.tax_rate ?? 19)}
           </p>
         </div>
       ),
@@ -615,6 +618,7 @@ function ProductsPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
+      <MonthlyActivity product={activity} onClose={() => setActivity(null)} />
       <DataTable
         columns={columns}
         data={isLoading ? [] : products}
@@ -712,6 +716,7 @@ function ProductsPage() {
             <FieldError message={getAdjustmentError('reason', adjustmentErrors)} />
           </label>
 
+          <label className="block"><span className="field-label">Referencia (obra, documento o autorización)</span><input className="input" maxLength={120} value={adjustmentForm.reference || ''} onChange={event => setAdjustmentForm(current => ({ ...current, reference: event.target.value }))} /></label>
           <div className="alert alert-warning">
             Saldo estimado: {getProjectedStock(productToAdjust, adjustmentForm)}. El backend confirmara el saldo final.
           </div>

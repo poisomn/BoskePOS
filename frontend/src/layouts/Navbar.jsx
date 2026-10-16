@@ -1,38 +1,26 @@
-import { FiLogOut, FiMenu, FiUser } from 'react-icons/fi'
-
+import { FiLogOut, FiMenu } from 'react-icons/fi'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { navItems } from './navigation'
 
 function Navbar({ isMenuOpen, onToggleMenu }) {
   const { logout, user } = useAuth()
-
+  const { pathname } = useLocation()
+  const current = navItems.find((item) => item.to === '/' ? pathname === '/' : pathname.startsWith(item.to))
+  const name = user?.first_name || user?.email?.split('@')[0] || 'Usuario'
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-white px-4 sm:px-6 lg:px-8" style={{ borderColor: 'var(--color-border)' }}>
-      <button className="btn btn-secondary lg:hidden" type="button" aria-label="Abrir navegacion"
-        aria-expanded={isMenuOpen} aria-controls="mobile-navigation" onClick={onToggleMenu}>
-        <FiMenu aria-hidden="true" />
-      </button>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-brand-700)' }}>
-          BoskePOS
-        </p>
-        <h1 className="text-base font-semibold">Sistema operativo</h1>
+    <header className="app-navbar">
+      <div className="flex min-w-0 items-center gap-3">
+        <button className="icon-btn lg:hidden" type="button" aria-label="Abrir navegación" aria-expanded={isMenuOpen} aria-controls="mobile-navigation" onClick={onToggleMenu}><FiMenu aria-hidden="true" /></button>
+        <img src="/brand/boskepos-copa.png" alt="" aria-hidden="true" width={44} height={44} className="navbar-mascot" />
+        <div className="min-w-0"><p className="navbar-eyebrow">BoskePOS <span>/ {current?.group || 'Operación'}</span></p><p className="navbar-title">{current?.label || 'Acceso'}</p></div>
       </div>
-
-      <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-2 text-sm sm:flex" style={{ color: 'var(--color-text-muted)' }}>
-          <FiUser aria-hidden="true" />
-          <span>{user?.email}</span>
-          {user?.roles?.length ? (
-            <span className="badge badge-neutral">{user.roles.join(', ')}</span>
-          ) : null}
-        </div>
-        <button className="btn btn-secondary" type="button" onClick={logout}>
-          <FiLogOut aria-hidden="true" />
-          Salir
-        </button>
+      <div className="navbar-account">
+        <div className="user-avatar" aria-hidden="true">{name.slice(0, 2).toUpperCase()}</div>
+        <div className="user-details"><span className="user-email" title={user?.email}>{user?.email}</span><span className="user-role">{user?.roles?.join(', ') || 'Usuario'}</span></div>
+        <button className="icon-btn" type="button" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"><FiLogOut aria-hidden="true" /></button>
       </div>
     </header>
   )
 }
-
 export default Navbar

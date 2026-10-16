@@ -89,6 +89,8 @@ function DashboardPage() {
   }
 
   const quickActions = [
+    { icon: FiTrendingUp, label: 'Reportes y márgenes', onClick: () => navigate('/reports'), visible: hasPermission('sales:read') },
+    { icon: FiCreditCard, label: 'Cajas y cierres', onClick: () => navigate('/cash'), visible: hasPermission('sales:complete') },
     {
       icon: FiShoppingCart,
       label: 'Abrir POS',
@@ -138,6 +140,9 @@ function DashboardPage() {
       {error ? <ErrorState message={error} onRetry={() => fetchSummary({ dateFrom, dateTo })} /> : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard icon={FiCreditCard} isLoading={isLoading} label="Ticket promedio" note="Ventas / transacciones" unavailable={!hasPermission('sales:read')} value={summary?.sales?.average_ticket != null ? formatMoney(summary.sales.average_ticket) : 'Sin ventas'} />
+        <KpiCard icon={FiUser} isLoading={isLoading} label="Clientes identificados" note="Clientes únicos del período" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.identified_customers) : '-'} />
+        <KpiCard icon={FiShoppingCart} isLoading={isLoading} label="Transacciones anónimas" note="No equivalen a personas únicas" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.anonymous_transactions) : '-'} />
         <KpiCard
           icon={FiTrendingUp}
           isLoading={isLoading}

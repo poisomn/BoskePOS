@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import Mascot from '../../components/Mascot'
+import BrandLogo from '../../components/BrandLogo'
 import LoginForm from './LoginForm'
 
 function LoginPage() {
@@ -34,22 +36,19 @@ function LoginPage() {
   return (
     <div className="w-full max-w-md">
       <div className="mb-8 text-center lg:hidden">
-        <img
-          src="/brand/LogoBoskePOS.webp"
-          alt="BoskePOS"
-          className="mx-auto h-24 w-auto object-contain"
-        />
+        <BrandLogo className="mx-auto max-w-xs" />
       </div>
 
       <section className="surface p-6">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-3"><div>
           <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
             Acceso seguro
           </p>
           <h1 className="mt-2 text-2xl font-semibold">Iniciar sesion</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Usa las credenciales creadas en el backend para entrar al sistema.
+            Ingresa con tu cuenta para comenzar a trabajar.
           </p>
+          </div><Mascot state={isSubmitting ? 'cargando' : error ? 'error' : undefined} size={88} />
         </div>
 
         <LoginForm error={error} isSubmitting={isSubmitting} onSubmit={handleLogin} />

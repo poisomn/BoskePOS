@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:mascot": "node --test scripts/test-mascot-controller.mjs && npm run test:pos-mascot",
+    "test:pos-mascot": "vite build --ssr scripts/test-pos-mascot.jsx --outDir node_modules/.cache/pos-mascot-test && node node_modules/.cache/pos-mascot-test/test-pos-mascot.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

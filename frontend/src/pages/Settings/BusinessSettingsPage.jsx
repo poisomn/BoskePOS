@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { percentInput } from '../../utils/formatters'
 import { FiSave, FiSettings } from 'react-icons/fi'
 
 import { getBusinessSettings, updateBusinessSettings } from '../../services/settingsService'
@@ -13,7 +15,8 @@ const emptyForm = {
   phone: '',
   email: '',
   currency: 'CLP',
-  default_tax_rate: '19.00',
+  default_tax_rate: '19',
+  seller_discount_limit: 5,
   ticket_footer: '',
 }
 
@@ -31,7 +34,7 @@ function BusinessSettingsPage() {
 
     try {
       const data = await getBusinessSettings()
-      setForm({ ...emptyForm, ...data })
+      setForm({ ...emptyForm, ...data, default_tax_rate: percentInput(data.default_tax_rate) })
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, 'No se pudo cargar la configuracion.'))
     } finally {
@@ -65,9 +68,10 @@ function BusinessSettingsPage() {
         email: form.email.trim(),
         currency: form.currency.trim().toUpperCase(),
         default_tax_rate: form.default_tax_rate,
+        seller_discount_limit: Number(form.seller_discount_limit),
         ticket_footer: form.ticket_footer.trim(),
       })
-      setForm({ ...emptyForm, ...data })
+      setForm({ ...emptyForm, ...data, default_tax_rate: percentInput(data.default_tax_rate) })
       setSuccessMessage('Configuracion actualizada correctamente.')
     } catch (requestError) {
       if (requestError.response?.status === 400) {
@@ -109,6 +113,7 @@ function BusinessSettingsPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
+      <div className="flex flex-wrap gap-2"><Link className="btn btn-secondary" to="/settings/users">Usuarios y PIN</Link><Link className="btn btn-secondary" to="/cash">Cajas</Link></div>
       <form className="surface space-y-5 p-5" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <TextField
@@ -174,6 +179,8 @@ function BusinessSettingsPage() {
           </div>
         </div>
 
+        <TextField error={fieldErrors.seller_discount_limit} label="Límite de descuento de vendedor (%)" type="number" value={form.seller_discount_limit} onChange={value => updateField('seller_discount_limit', value)} />
+        <p className="section-note">Los descuentos que superan este límite requieren autorización de administrador. Cada descuento registra un motivo.</p>
         <label>
           <span className="field-label">Pie de comprobante</span>
           <textarea

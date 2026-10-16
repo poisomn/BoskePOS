@@ -50,6 +50,7 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    'apps.cash',
     'apps.accounts',
     'apps.customers',
     'apps.dashboard',

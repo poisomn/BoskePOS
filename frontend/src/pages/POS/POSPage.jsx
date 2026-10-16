@@ -1,3 +1,5 @@
+import { ProductResults } from './ProductResults'
+export { ProductResults } from './ProductResults'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -460,7 +462,7 @@ function POSPage() {
   }
 
   return (
-    <div className="grid min-h-[calc(100svh-8rem)] w-full gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
+    <div className="pos-workspace grid min-h-[calc(100svh-8rem)] w-full gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
       <section className="flex min-h-0 flex-col gap-4">
         <PosStatusBar
           activeSuspendedSaleId={activeSuspendedSaleId}
@@ -487,11 +489,12 @@ function POSPage() {
           searchInputRef={searchInputRef}
         />
 
-        {error ? <div className="alert alert-error">{error}</div> : null}
+        {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
         {quoteError ? <div className="alert alert-error" role="alert">{quoteError}</div> : null}
 
         <ProductResults
-          isSearching={isSearching}
+          error={quoteError || barcodeError || error}
+          isProcessing={isSearching || isBarcodeLoading || isQuoting || isRegisteringSale || isSuspendingSale}
           onAddProduct={addProduct}
           results={searchResults}
           search={search}
@@ -549,7 +552,7 @@ function POSPage() {
 function PosStatusBar({ activeSuspendedSaleId, customerName, isQuoting, user }) {
   return (
     <section className="surface p-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+      <div className="pos-status-grid">
         <StatusItem label="Caja" value="Principal" />
         <StatusItem label="Sesion" value="Iniciada" />
         <StatusItem label="Cajero" value={user?.email ?? 'Usuario'} />
@@ -577,13 +580,13 @@ function StatusItem({ icon: Icon = null, label, tone = 'neutral', value }) {
   const badgeClass = tone === 'success' ? 'badge-success' : tone === 'warning' ? 'badge-warning' : 'badge-neutral'
 
   return (
-    <div className="rounded-lg border bg-white px-3 py-2" style={{ borderColor: 'var(--color-border)' }}>
+    <div className="pos-status-item" style={{ borderColor: 'var(--color-border)' }}>
       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
         {label}
       </p>
       <span className={`badge mt-2 max-w-full ${badgeClass}`}>
         {Icon ? <Icon aria-hidden="true" /> : null}
-        <span className="truncate">{value}</span>
+        <span className="truncate" title={value}>{value}</span>
       </span>
     </div>
   )
@@ -631,7 +634,7 @@ function ProductSearchPanel({
             placeholder="Escanea o escribe el codigo y presiona Enter"
             ref={barcodeInputRef}
           />
-          {barcodeError ? <div className="alert alert-error mt-3">{barcodeError}</div> : null}
+          {barcodeError ? <div className="alert alert-error mt-3" role="alert">{barcodeError}</div> : null}
           {barcodeProduct ? (
             <div className="alert alert-success mt-3">
               Producto agregado: {barcodeProduct.name}
@@ -677,82 +680,6 @@ function ProductSearchPanel({
   )
 }
 
-function ProductResults({ isSearching, onAddProduct, results, search, selectedIndex }) {
-  return (
-    <section className="surface min-h-0 flex-1 overflow-hidden">
-      <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--color-border)' }}>
-        <div>
-          <h2 className="section-title">Resultados</h2>
-          <p className="section-note">
-            {isSearching ? 'Buscando productos...' : 'Selecciona un producto para agregarlo.'}
-          </p>
-        </div>
-        <span className="badge badge-neutral">{results.length} resultados</span>
-      </div>
-
-      <div className="max-h-full overflow-auto p-3">
-        {results.length ? (
-          <div className="grid gap-2">
-            {results.map((product, index) => (
-              <ProductResultRow
-                isSelected={index === selectedIndex}
-                key={product.id}
-                onAdd={() => onAddProduct(product)}
-                product={product}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid min-h-64 place-items-center text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            {search ? 'No se encontraron productos.' : 'Escribe o escanea para buscar productos.'}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function ProductResultRow({ isSelected, onAdd, product }) {
-  return (
-    <button
-      aria-label={`Agregar ${product.name} al carrito`}
-      className="grid gap-3 rounded-lg border bg-white p-4 text-left transition hover:bg-[var(--color-steel-50)] md:grid-cols-[minmax(0,1fr)_150px_110px]"
-      onClick={onAdd}
-      style={{
-        borderColor: isSelected ? 'var(--color-brand-600)' : 'var(--color-border)',
-        boxShadow: isSelected ? '0 0 0 3px rgb(217 119 6 / 0.16)' : 'var(--shadow-xs)',
-      }}
-      type="button"
-    >
-      <div className="min-w-0">
-        <p className="truncate font-semibold">{product.name}</p>
-        <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          SKU {product.sku}
-          {product.barcode ? ` - ${product.barcode}` : ''}
-        </p>
-        {product.category?.name ? (
-          <p className="mt-1 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {product.category.name}
-          </p>
-        ) : null}
-      </div>
-      <div className="text-sm">
-        <p className="font-semibold">{formatMoney(product.sale_price)}</p>
-        <p className={Number(product.stock) <= 0 ? 'badge badge-error mt-2' : 'badge badge-success mt-2'}>
-          Stock {product.stock}
-        </p>
-      </div>
-      <span className="btn btn-primary h-9 self-center px-3" aria-hidden="true">
-        <FiPlus aria-hidden="true" />
-        Agregar
-      </span>
-      <span className="sr-only">
-        Presiona Enter o espacio para agregar este producto.
-      </span>
-    </button>
-  )
-}
-
 function PosCart({
   activeSuspendedSaleId,
   amountPaid,
@@ -785,7 +712,7 @@ function PosCart({
   suspendedSales,
 }) {
   return (
-    <aside className="surface flex min-h-[620px] flex-col">
+    <aside className="pos-cart surface flex min-h-[620px] flex-col">
       <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-border)' }}>
         <div className="flex items-center justify-between gap-4">
           <div>

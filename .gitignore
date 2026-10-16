@@ -128,3 +128,25 @@ Thumbs.db
 *.sln
 *.sw?
 *~
+
+# ==========================================
+# Propuesta e informes de Proyecto de Título (solo locales)
+# ==========================================
+/frontend/src/pages/Projects/
+/scripts/test-proposal.mjs
+/scripts/build_audit_report.py
+/docs/proyecto-titulo/
+/docs/proyecto-de-titulo/
+/docs/demo-propuesta-obras.md
+/docs/propuesta-obras-presupuestos-ia.md
+/docs/estrategia-modelo-ia-entrenamiento.md
+/docs/auditoria-mvp-*.md
+/docs/revision-informe*
+/docs/informe*
+
+# Documentos académicos y entregables generados
+/output/
+*Proyecto_de_Titulo*
+*Proyecto_de_Título*
+*Proyecto de Titulo*
+*Proyecto de Título*

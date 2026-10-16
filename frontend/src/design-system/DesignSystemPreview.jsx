@@ -49,7 +49,7 @@ function DesignSystemPreview() {
         <aside className="sidebar hidden lg:flex">
           <div className="border-b p-4" style={{ borderColor: 'var(--color-border)' }}>
             <img
-              src="/brand/LogoBoskePOS.webp"
+              src="/brand/boskepos-logo.png"
               alt="BoskePOS"
               className="h-14 w-auto object-contain"
             />

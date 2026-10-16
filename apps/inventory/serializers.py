@@ -215,6 +215,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
 
 
 class StockAdjustmentSerializer(serializers.Serializer):
+    reference = serializers.CharField(max_length=120, required=False, allow_blank=True, default='')
     movement_type = serializers.ChoiceField(choices=StockMovement.MovementType.choices)
     quantity = serializers.IntegerField(min_value=1)
     reason = serializers.CharField(allow_blank=False, trim_whitespace=True)
@@ -238,6 +239,7 @@ class StockAdjustmentSerializer(serializers.Serializer):
             movement_type=validated_data['movement_type'],
             quantity=validated_data['quantity'],
             reason=validated_data['reason'],
+            reference=validated_data.get('reference', ''),
             user=self.context['request'].user,
         )
         return result.movement

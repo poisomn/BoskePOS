@@ -1,13 +1,14 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { FiArrowLeft, FiCheckCircle, FiFileText, FiPrinter, FiXCircle } from 'react-icons/fi'
+import { FiArrowLeft, FiFileText, FiPrinter, FiXCircle } from 'react-icons/fi'
 
+import Mascot from '../../components/Mascot'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { useAuth } from '../../hooks/useAuth'
 import { cancelSale, getSale } from '../../services/salesService'
 import { getReceiptSettings } from '../../services/settingsService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
-import { formatDateTime, formatMoney } from '../../utils/formatters'
+import { formatDateTime, formatMoney, formatPercent } from '../../utils/formatters'
 
 function SaleDetailPage() {
   const { saleId } = useParams()
@@ -86,9 +87,9 @@ function SaleDetailPage() {
   return (
     <div className="w-full space-y-6">
       {saleRegistered ? (
-        <div className="alert alert-success">
-          <FiCheckCircle aria-hidden="true" />
-          Venta registrada correctamente.
+        <div className="alert alert-success state-message" role="status">
+          <Mascot state="exito" temporary size={64} />
+          <div><p className="font-semibold">Venta registrada correctamente.</p><p className="mt-1 text-xs">Tu comprobante está listo.</p></div>
         </div>
       ) : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
@@ -161,8 +162,8 @@ function SaleDetailPage() {
                     <td>{item.product_name}</td>
                     <td>{item.quantity}</td>
                     <td>{formatMoney(item.unit_price)}</td>
-                    <td>{formatMoney(item.discount_total)}</td>
-                    <td>{formatMoney(item.tax_total)}</td>
+                    <td>{formatMoney(item.discount_total)}{item.discount_percent != null && Number(item.discount_percent) > 0 ? ` (${formatPercent(item.discount_percent)})` : ''}</td>
+                    <td>{formatMoney(item.tax_total)}{item.tax_rate != null ? ` (${formatPercent(item.tax_rate)})` : ''}</td>
                     <td><strong>{formatMoney(item.line_total)}</strong></td>
                   </tr>
                   {item.note ? (
@@ -188,8 +189,10 @@ function SaleDetailPage() {
             </div>
             <div className="flex justify-between">
               <span style={{ color: 'var(--color-text-muted)' }}>Cajero</span>
-              <strong>{sale.user_email}</strong>
+              <strong>{sale.cashier_email || 'No registrado en venta histórica'}</strong>
             </div>
+            <div className="flex justify-between"><span style={{ color: 'var(--color-text-muted)' }}>Vendedor</span><strong>{sale.user_email}</strong></div>
+            {sale.discount_reason && <div><span className="section-note">Motivo del descuento</span><p>{sale.discount_reason}</p></div>}
             <div className="flex justify-between">
               <span style={{ color: 'var(--color-text-muted)' }}>Estado</span>
               <StatusBadge status={sale.status} label={sale.status_label} />
@@ -222,6 +225,7 @@ function SaleDetailPage() {
               <span>Descuentos</span>
               <strong>{formatMoney(sale.discount_total)}</strong>
             </div>
+            {Number(sale.rounding_adjustment) !== 0 && <div className="flex justify-between text-sm"><span>Redondeo al peso</span><strong>{formatMoney(sale.rounding_adjustment)}</strong></div>}
             <div className="flex justify-between">
               <span>IVA incluido</span>
               <strong>{formatMoney(sale.tax_total)}</strong>

@@ -36,6 +36,8 @@ class AuditRegressionTests(APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(self.user)
+        from apps.cash.models import CashRegister, CashSession
+        CashSession.objects.create(register=CashRegister.objects.create(name='Test till'), cashier=self.user, opening_amount=0)
 
     def test_catalog_edit_cannot_overwrite_a_concurrent_stock_movement(self):
         serializer = ProductSerializer(self.product, data={'name': 'New name'}, partial=True)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { percentInput } from '../../utils/formatters'
 
 const PRODUCT_UNITS = [
   { label: 'Unidad', value: 'unidad' },
@@ -22,7 +23,7 @@ const initialState = {
   description: '',
   cost_price: '0.00',
   sale_price: '',
-  tax_rate: '19.00',
+  tax_rate: '19',
   stock: '0',
   minimum_stock: '0',
   is_active: true,
@@ -303,7 +304,7 @@ function mapProductToForm(product) {
     description: product.description ?? '',
     cost_price: product.cost_price ?? '0.00',
     sale_price: product.sale_price ?? '',
-    tax_rate: product.tax_rate ?? '19.00',
+    tax_rate: percentInput(product.tax_rate ?? 19),
     stock: String(product.stock ?? 0),
     minimum_stock: String(product.minimum_stock ?? 0),
     is_active: Boolean(product.is_active),

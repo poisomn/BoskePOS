@@ -28,6 +28,9 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractUser):
+    authorization_pin_hash = models.CharField(max_length=128, blank=True, default='')
+    pin_failed_attempts = models.PositiveSmallIntegerField(default=0)
+    pin_locked_until = models.DateTimeField(null=True, blank=True)
     username = None
     email = models.EmailField(unique=True)
 

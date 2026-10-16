@@ -16,6 +16,8 @@ from .services import SaleConflict, cancel_sale, register_sale
 class SaleConcurrencyTests(TransactionTestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(email='concurrency@example.test', password=None)
+        from apps.cash.models import CashRegister, CashSession
+        CashSession.objects.create(register=CashRegister.objects.create(name='Test till'), cashier=self.user, opening_amount=0)
         self.product = Product.objects.create(name='Last unit', sku='LAST', stock=1, sale_price='1190')
 
     def test_two_cashiers_cannot_sell_the_same_last_unit(self):

@@ -7,6 +7,8 @@ from .health import health
 
 
 urlpatterns = [
+    path('api/cash/', include('apps.cash.urls')),
+    path('api/reports/', include('apps.reports.urls')),
     path('api/health/', health, name='health'),
     path('admin/', admin.site.urls),
     path('api/accounts/', include('apps.accounts.urls')),

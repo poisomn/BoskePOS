@@ -8,6 +8,7 @@ from .permissions import get_user_app_permissions, get_user_roles
 
 
 class UserSerializer(serializers.ModelSerializer):
+    has_authorization_pin = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
 
@@ -21,10 +22,15 @@ class UserSerializer(serializers.ModelSerializer):
             'is_staff',
             'is_active',
             'roles',
+            'has_authorization_pin',
             'permissions',
             'date_joined',
         )
         read_only_fields = fields
+
+    def get_has_authorization_pin(self, obj):
+        from .permissions import has_role, ADMIN_ROLE
+        return bool(obj.is_active and has_role(obj, ADMIN_ROLE) and obj.authorization_pin_hash)
 
     def get_roles(self, obj):
         return sorted(get_user_roles(obj))

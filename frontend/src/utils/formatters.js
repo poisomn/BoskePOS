@@ -1,9 +1,18 @@
-export function formatMoney(value) {
+export function formatMoney(value, maximumFractionDigits = 2) {
   return new Intl.NumberFormat('es-CL', {
     currency: 'CLP',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
     style: 'currency',
-  }).format(Number(value))
+  }).format(Object.is(Number(value), -0) ? 0 : Number(value))
+}
+
+export function formatPercent(value) {
+  return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(Number(value))}%`
+}
+
+export function percentInput(value) {
+  return String(Number(value ?? 0))
 }
 
 export function formatDateTime(value) {
