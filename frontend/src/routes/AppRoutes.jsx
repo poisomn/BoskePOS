@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Mascot from '../components/Mascot'
+import { localRoutes } from '../localExtensions'
 import AuthLayout from '../layouts/AuthLayout'
 import AppLayout from '../layouts/AppLayout'
 import AccessDeniedPage from '../pages/Auth/AccessDeniedPage'
@@ -31,6 +32,9 @@ const routeFallback = <div className="surface p-5 state-message" role="status"><
 function AppRoutes() {
   return (
     <Routes>
+      {localRoutes.filter((route) => !route.requiresAuth).map(({ path, Component }) => (
+        <Route key={path} path={path} element={<Suspense fallback={routeFallback}><Component /></Suspense>} />
+      ))}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
@@ -46,6 +50,9 @@ function AppRoutes() {
       ) : null}
 
       <Route element={<ProtectedRoute />}>
+        {localRoutes.filter((route) => route.requiresAuth).map(({ path, Component }) => (
+          <Route key={path} path={path} element={<Suspense fallback={routeFallback}><Component /></Suspense>} />
+        ))}
         <Route element={<AppLayout />}>
           <Route
             index

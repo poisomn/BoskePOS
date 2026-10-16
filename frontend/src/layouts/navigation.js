@@ -1,4 +1,5 @@
 import { FiBarChart2, FiCreditCard, FiFileText, FiGrid, FiHome, FiPackage, FiSettings, FiShoppingBag, FiShoppingCart, FiTruck, FiUsers } from 'react-icons/fi'
+import { localNavItems } from '../localExtensions'
 
 export const navItems = [
   { icon: FiHome, label: 'Dashboard', to: '/', group: 'Operación' },
@@ -7,6 +8,7 @@ export const navItems = [
   { icon: FiFileText, label: 'Ventas', permissions: ['sales:read'], to: '/sales', group: 'Operación' },
   { icon: FiBarChart2, label: 'Reportes', permissions: ['sales:read'], to: '/reports', group: 'Operación' },
   { icon: FiShoppingBag, label: 'Compras', permissions: ['purchases:read'], to: '/purchases', group: 'Operación' },
+  ...localNavItems,
   { icon: FiPackage, label: 'Productos', permissions: ['inventory:read'], to: '/inventory/products', group: 'Catálogo y contactos' },
   { icon: FiGrid, label: 'Categorías', permissions: ['inventory:read'], to: '/inventory/categories', group: 'Catálogo y contactos' },
   { icon: FiUsers, label: 'Clientes', permissions: ['customers:read'], to: '/customers', group: 'Catálogo y contactos' },

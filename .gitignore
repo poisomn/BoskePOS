@@ -133,6 +133,7 @@ Thumbs.db
 # Propuesta e informes de Proyecto de Título (solo locales)
 # ==========================================
 /frontend/src/pages/Projects/
+/frontend/src/local/
 /scripts/test-proposal.mjs
 /scripts/build_audit_report.py
 /docs/proyecto-titulo/
