@@ -1,3 +1,6 @@
+import { useLocation } from 'react-router-dom'
+import { PageHeading, PageStats, RecordDrawer, DensityControl, ExportButton } from '../../components/OperationsUI'
+import { useSearchParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiCheckCircle, FiEdit2, FiEye, FiSearch, FiXCircle } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
@@ -23,12 +26,17 @@ const PAGE_SIZE = 8
 function PurchasesPage() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
+  const location = useLocation()
+  const [suggestion, setSuggestion] = useState(() => location.state?.replenishment || null)
+  const [contactParams] = useSearchParams()
+  const contactId = contactParams.get('supplier') || ''
+  const [detail, setDetail] = useState(null)
   const [confirmTarget, setConfirmTarget] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [editingPurchase, setEditingPurchase] = useState(null)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(() => Boolean(location.state?.replenishment))
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [page, setPage] = useState(1)
@@ -46,6 +54,7 @@ function PurchasesPage() {
       const data = await listPurchasesPage({
         page,
         pageSize: PAGE_SIZE,
+        supplier: contactId,
         search,
         status: statusFilter,
       })
@@ -56,7 +65,7 @@ function PurchasesPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [page, search, statusFilter])
+  }, [page, search, statusFilter, contactId])
 
   useEffect(() => {
     queueMicrotask(fetchPurchases)
@@ -69,6 +78,7 @@ function PurchasesPage() {
   }, [isLoading, search, statusFilter])
 
   function openCreateModal() {
+    setSuggestion(null)
     setEditingPurchase(null)
     setFieldErrors({})
     setIsFormOpen(true)
@@ -185,7 +195,7 @@ function PurchasesPage() {
               </button>
             </>
           ) : null}
-          {purchase.status === 'confirmed' && hasPermission('purchases:cancel') ? (
+          {['confirmed', 'partial'].includes(purchase.status) && hasPermission('purchases:cancel') ? (
             <button aria-label={`Anular compra ${purchase.id}`} className="icon-btn" onClick={() => setCancelTarget(purchase)} type="button">
               <FiXCircle aria-hidden="true" />
             </button>
@@ -197,24 +207,9 @@ function PurchasesPage() {
 
   return (
     <div className="w-full space-y-6">
-      <section className="surface p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
-              Compras
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold">Compras</h1>
-            <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Registra entradas de mercaderia y confirma inventario con trazabilidad.
-            </p>
-          </div>
-          {hasPermission('purchases:write') ? (
-            <button className="btn btn-primary" onClick={openCreateModal} type="button">
-              Nueva compra
-            </button>
-          ) : null}
-        </div>
-      </section>
+      <PageHeading section="Compras" title="Abastece con tranquilidad" description="Desde el borrador hasta la recepción, con trazabilidad.">{hasPermission('purchases:write') && <button className="btn btn-primary" onClick={openCreateModal} type="button">Nueva compra</button>}</PageHeading>
+      <PageStats total={total} rows={purchases} resource="compras" />
+      <div className="ops-table-top"><DensityControl /><ExportButton rows={purchases} name="purchases" columns={[['id','Identificador','number'],['supplier_name','Proveedor'],['reference','Referencia'],['status_label','Estado'],['total','Total','money'],['created_at','Fecha','date']]} /></div>
 
       <section className="surface p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-end">
@@ -245,7 +240,7 @@ function PurchasesPage() {
             >
               <option value="">Todos</option>
               <option value="draft">Borrador</option>
-              <option value="confirmed">Confirmada</option>
+              <option value="partial">Recepción parcial</option><option value="confirmed">Recibida</option>
               <option value="cancelled">Anulada</option>
             </select>
           </label>
@@ -255,7 +250,9 @@ function PurchasesPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
+      <RecordDrawer record={detail} resource="Compra" onClose={() => setDetail(null)} />
       <DataTable
+        onRowSelect={setDetail}
         columns={columns}
         data={isLoading ? [] : purchases}
         emptyMessage={emptyMessage}
@@ -275,7 +272,7 @@ function PurchasesPage() {
           isSubmitting={isSubmitting}
           onCancel={() => setIsFormOpen(false)}
           onSubmit={handleSubmit}
-          purchase={editingPurchase}
+          purchase={editingPurchase || suggestion}
         />
       </FormModal>
 
@@ -310,9 +307,10 @@ function StatusBadge({ label, status }) {
     cancelled: 'badge-error',
     confirmed: 'badge-success',
     draft: 'badge-warning',
+    partial: 'badge-warning',
   }[status] ?? 'badge-neutral'
 
-  return <span className={`badge ${className}`}>{label}</span>
+  return <span className={`badge ${className}`}>{status === 'confirmed' ? 'Recibida' : label}</span>
 }
 
 export default PurchasesPage

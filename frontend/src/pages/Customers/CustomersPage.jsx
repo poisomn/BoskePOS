@@ -1,3 +1,5 @@
+import { useAuth } from '../../hooks/useAuth'
+import { PageHeading, PageStats, RecordDrawer, DensityControl, ExportButton } from '../../components/OperationsUI'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiEdit2, FiPower, FiRefreshCw, FiSearch } from 'react-icons/fi'
 
@@ -17,6 +19,8 @@ import CustomerForm from './CustomerForm'
 const PAGE_SIZE = 8
 
 function CustomersPage() {
+  const { hasPermission } = useAuth()
+  const [detail, setDetail] = useState(null)
   const [customerToDeactivate, setCustomerToDeactivate] = useState(null)
   const [customers, setCustomers] = useState([])
   const [editingCustomer, setEditingCustomer] = useState(null)
@@ -169,7 +173,7 @@ function CustomersPage() {
     {
       key: 'actions',
       header: 'Acciones',
-      render: (customer) => (
+      render: (customer) => hasPermission('customers:write') ? (
         <div className="flex gap-2">
           <button aria-label={`Editar ${customer.name}`} className="icon-btn" onClick={() => openEditModal(customer)} type="button">
             <FiEdit2 aria-hidden="true" />
@@ -195,29 +199,15 @@ function CustomersPage() {
             </button>
           )}
         </div>
-      ),
+      ) : <span className="section-note">Solo lectura</span>,
     },
   ]
 
   return (
     <div className="w-full space-y-6">
-      <section className="surface p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
-              Clientes
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold">Clientes</h1>
-            <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Administra clientes y busca rapidamente por nombre o RUT.
-            </p>
-          </div>
-
-          <button className="btn btn-primary" onClick={openCreateModal} type="button">
-            Nuevo cliente
-          </button>
-        </div>
-      </section>
+      <PageHeading section="Clientes" title="Conoce a quienes vuelven" description="Personas, empresas y contactos en una misma vista.">{hasPermission('customers:write') && <button className="btn btn-primary" onClick={openCreateModal} type="button">Nuevo cliente</button>}</PageHeading>
+      <PageStats total={total} rows={customers} resource="clientes" />
+      <div className="ops-table-top"><DensityControl /><ExportButton rows={customers} name="customers" columns={[['id','Identificador','number'],['name','Nombre'],['rut','RUT'],['email','Correo'],['phone','Teléfono'],['is_active','Estado','active']]} /></div>
 
       <section className="surface p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-end">
@@ -251,7 +241,9 @@ function CustomersPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
+      <RecordDrawer record={detail} resource="Cliente" onClose={() => setDetail(null)} />
       <DataTable
+        onRowSelect={setDetail}
         columns={columns}
         data={isLoading ? [] : customers}
         emptyMessage={emptyMessage}

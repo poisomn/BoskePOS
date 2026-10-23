@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 class Purchase(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Borrador'
+        PARTIAL = 'partial', 'Recepción parcial'
         CONFIRMED = 'confirmed', 'Confirmada'
         CANCELLED = 'cancelled', 'Anulada'
 
@@ -45,6 +46,7 @@ class Purchase(models.Model):
 
 
 class PurchaseItem(models.Model):
+    received_quantity = models.PositiveIntegerField(default=0)
     purchase = models.ForeignKey(Purchase, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(
         'inventory.Product',
@@ -72,3 +74,17 @@ class PurchaseItem(models.Model):
 
     def __str__(self):
         return f'{self.product_sku} x {self.quantity}'
+
+
+class PurchaseReceipt(models.Model):
+    purchase = models.ForeignKey(Purchase, related_name='receipts', on_delete=models.PROTECT)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    key = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+    lines = models.JSONField()
+    notes = models.CharField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('created_at', 'id')
+        constraints = [models.UniqueConstraint(fields=('purchase', 'key'), name='purchase_receipt_idempotency')]

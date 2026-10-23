@@ -1,11 +1,15 @@
+import { businessToday, shiftDate } from '../../utils/dateRanges'
+import DateRangePicker from '../../components/DateRangePicker'
+import { PageHeading } from '../../components/OperationsUI'
+import { downloadCsv } from '../../utils/exportCsv'
 import { useEffect, useState } from 'react'
 import { http } from '../../api/http'
-import { formatMoney, formatPercent, formatDateTime } from '../../utils/formatters'
+import { formatMoney, formatPercent, formatDateTime, formatNumber } from '../../utils/formatters'
 import { getApiErrorMessage } from '../../utils/apiErrors'
 
 const methods = { cash: 'Efectivo', debit: 'Débito', credit: 'Crédito', transfer: 'Transferencia' }
 export default function OperationsPage() {
-  const [filters, setFilters] = useState({ date_from: '', date_to: '' })
+  const [filters, setFilters] = useState(() => { const today = businessToday(); return { date_from: shiftDate(today, -29), date_to: today } })
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -15,7 +19,7 @@ export default function OperationsPage() {
     return () => controller.abort()
   }, [filters])
   const profit = data?.profitability
-  return <div className="space-y-5"><section className="surface p-5"><h1 className="text-2xl font-semibold">Ventas y gestión</h1><p className="section-note mt-2">Ventas completadas vigentes, con descuentos e IVA incluido. Las anuladas y pendientes se excluyen. Período en hora de Chile.</p><div className="grid sm:grid-cols-2 gap-3 mt-4">{[['date_from', 'Desde'], ['date_to', 'Hasta']].map(([key, label]) => <label key={key}><span className="field-label">{label}</span><input className="input" type="date" value={filters[key]} onChange={e => setFilters({ ...filters, [key]: e.target.value })} /></label>)}</div></section>
+  return <div className="space-y-5"><PageHeading section="Reportes" title="Decisiones con buenos números" description="Ventas, medios de pago y márgenes, con cifras sin decimales." />{data && <button className="btn btn-secondary" onClick={() => downloadCsv('reporte-operaciones', ['Sección', 'Detalle', 'Valor'], [...data.daily.map(row => ['Venta diaria', row.date, formatMoney(row.total)]), ...data.payment_methods.map(row => ['Medio de pago', methods[row.method], formatMoney(row.total)]), ...data.top_products.map(row => ['Producto', row.name, formatNumber(row.quantity)]), ...data.cashiers.map(row => ['Cajero', row.cashier, formatMoney(row.total)])])}>Exportar reporte del período</button>}<section className="surface p-5"><h1 className="text-2xl font-semibold">Ventas y gestión</h1><p className="section-note mt-2">Ventas completadas vigentes, con descuentos e IVA incluido. Las anuladas y pendientes se excluyen. Período en hora de Chile.</p><div className="mt-4 max-w-md"><DateRangePicker from={filters.date_from} to={filters.date_to} maxDays={366} onChange={({ from, to }) => setFilters({ date_from: from, date_to: to })} /></div></section>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {data && <><p className="section-note">{data.date_from} — {data.date_to}</p><div className="grid sm:grid-cols-3 gap-4">{[['Ventas', formatMoney(data.total)], ['Transacciones', data.transactions], ['Ticket promedio', data.average_ticket == null ? 'Sin ventas' : formatMoney(data.average_ticket)], ['Clientes identificados únicos', data.identified_customers], ['Transacciones anónimas', data.anonymous_transactions]].map(([label, value]) => <article key={label} className="surface p-5"><p className="section-note">{label}</p><strong className="text-2xl">{value}</strong></article>)}</div>
       <section className="surface p-5"><h2 className="section-title mb-3">Histórico de ventas</h2><div className="flex items-end gap-1 h-32 overflow-auto" role="img" aria-label="Ventas diarias; valores exactos en la tabla siguiente">{data.daily.map(row => <div key={row.date} title={`${row.date}: ${formatMoney(row.total)}`} className="flex-1 min-w-2 bg-[var(--color-brand-600)] rounded-t" style={{ height: `${Math.max(1, Number(row.total) / Math.max(1, ...data.daily.map(item => Number(item.total))) * 100)}%` }} />)}</div><details className="mt-3"><summary>Ver datos por día</summary><ReportTable headers={['Fecha', 'Ventas']} rows={data.daily.map(row => [row.date, formatMoney(row.total)])} /></details></section>
@@ -25,4 +29,4 @@ export default function OperationsPage() {
     </>}
   </div>
 }
-function ReportTable({ headers, rows }) { return <div className="overflow-auto mt-3"><table className="data-table"><thead><tr>{headers.map(header => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{row.map((value, col) => <td key={col}>{value}</td>)}</tr>)}{!rows.length && <tr><td colSpan={headers.length}>Sin operaciones en el período.</td></tr>}</tbody></table></div> }
+function ReportTable({ headers, rows }) { return <div className="overflow-auto mt-3"><table className="data-table"><thead><tr>{headers.map(header => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{row.map((value, col) => <td key={col}>{typeof value === 'number' || (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) ? formatNumber(value) : value}</td>)}</tr>)}{!rows.length && <tr><td colSpan={headers.length}>Sin operaciones en el período.</td></tr>}</tbody></table></div> }

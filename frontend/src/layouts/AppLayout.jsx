@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FiX } from 'react-icons/fi'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
+import '../design-system/operations.css'
 
 function AppLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -18,7 +19,7 @@ function AppLayout() {
     return () => desktop.removeEventListener('change', closeOnDesktop)
   }, [])
   return (
-    <div className="app-shell flex min-h-svh">
+    <div className="app-shell app-v2 flex min-h-svh">
       <a className="skip-link" href="#main-content">Ir al contenido</a>
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">

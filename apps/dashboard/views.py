@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import has_app_permission
 from apps.inventory.models import Product, StockMovement
 from apps.purchases.models import Purchase
-from apps.sales.models import Sale, SaleItem
+from apps.sales.models import Sale, SaleItem, PresaleTicket
 from apps.utils.query_params import optional_date
 
 
@@ -81,6 +81,10 @@ class DashboardSummaryView(APIView):
         if can_read_movements:
             data['stock_movements'] = self._build_stock_movements_summary(limit)
 
+        if has_app_permission(user, 'presales:read'):
+            tickets = PresaleTicket.objects.filter(status__in=('pending', 'claimed'), expires_at__gt=timezone.now())
+            data['presales'] = {'pending_count': tickets.count(),
+                'pending_total': str(tickets.aggregate(value=Sum('sale__total'))['value'] or 0)}
         return Response(data)
 
     def _get_period(self, request):

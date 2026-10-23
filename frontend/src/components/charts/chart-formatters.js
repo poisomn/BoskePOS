@@ -17,4 +17,4 @@ export const hmsTimeFmt = new Intl.DateTimeFormat("en-US", {
 });
 
 // `Intl.NumberFormat.prototype.format` is a bound getter — safe to extract.
-export const intFmt = new Intl.NumberFormat("en-US").format;
+export const intFmt = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format;

@@ -90,3 +90,52 @@ class SaleItem(models.Model):
 
     def __str__(self):
         return f'{self.product_sku} x {self.quantity}'
+
+
+class PresaleStation(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    is_active = models.BooleanField(default=True)
+    valid_minutes = models.PositiveIntegerField(default=0, help_text='0: vence al finalizar el día local.')
+
+    class Meta:
+        ordering = ('name',)
+
+
+class PresaleTicket(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pendiente de cobro'
+        CLAIMED = 'claimed', 'En caja'
+        PAID = 'paid', 'Pagado'
+        CANCELLED = 'cancelled', 'Cancelado'
+
+    sale = models.OneToOneField(Sale, related_name='presale_ticket', on_delete=models.PROTECT)
+    station = models.ForeignKey(PresaleStation, on_delete=models.PROTECT)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    expires_at = models.DateTimeField()
+    claimed_by = models.ForeignKey('accounts.User', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    claim_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    issued_by = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+    issue_key = models.UUIDField()
+    fingerprint = models.CharField(max_length=64)
+
+    class Meta:
+        ordering = ('created_at', 'id')
+        constraints = [models.UniqueConstraint(fields=('issued_by', 'issue_key'), name='presale_unique_issue')]
+        indexes = [models.Index(fields=('status', 'expires_at'))]
+
+    @property
+    def code(self):
+        return f'PV-{self.pk:08d}'
+
+
+class OperationEvent(models.Model):
+    actor = models.ForeignKey('accounts.User', null=True, on_delete=models.PROTECT)
+    entity = models.CharField(max_length=80)
+    entity_id = models.CharField(max_length=80)
+    action = models.CharField(max_length=80)
+    detail = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at', '-id')

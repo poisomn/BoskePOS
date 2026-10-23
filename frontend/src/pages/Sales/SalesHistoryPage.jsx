@@ -1,6 +1,8 @@
+import { PageHeading, PageStats, RecordDrawer, DensityControl, ExportButton } from '../../components/OperationsUI'
+import { useSearchParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FiEye, FiFileText, FiSearch } from 'react-icons/fi'
+import { FiEye, FiSearch } from 'react-icons/fi'
 
 import DataTable from '../../components/DataTable'
 import { useAuth } from '../../hooks/useAuth'
@@ -12,6 +14,9 @@ const PAGE_SIZE = 10
 
 function SalesHistoryPage() {
   const { hasPermission } = useAuth()
+  const [contactParams] = useSearchParams()
+  const contactId = contactParams.get('customer') || ''
+  const [detail, setDetail] = useState(null)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -28,6 +33,7 @@ function SalesHistoryPage() {
       const data = await listSalesPage({
         page,
         pageSize: PAGE_SIZE,
+        customer: contactId,
         search,
         status: statusFilter,
       })
@@ -38,7 +44,7 @@ function SalesHistoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [page, search, statusFilter])
+  }, [page, search, statusFilter, contactId])
 
   useEffect(() => {
     queueMicrotask(fetchSales)
@@ -95,25 +101,9 @@ function SalesHistoryPage() {
 
   return (
     <div className="w-full space-y-6">
-      <section className="surface p-5">
-        <div className="flex items-start gap-4">
-          <div
-            className="grid size-11 place-items-center rounded-md"
-            style={{ background: 'var(--color-brand-50)', color: 'var(--color-brand-700)' }}
-          >
-            <FiFileText aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
-              Ventas
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold">Historial de ventas</h1>
-            <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Consulta ventas registradas y abre su comprobante.
-            </p>
-          </div>
-        </div>
-      </section>
+      <PageHeading section="Ventas" title="Cada venta, en su lugar" description="Busca operaciones, consulta comprobantes y revisa sus estados."><Link className="btn btn-primary" to="/checkout">Ir a caja de venta</Link></PageHeading>
+      <PageStats total={total} rows={sales} resource="ventas" />
+      <div className="ops-table-top"><DensityControl /><ExportButton rows={sales} name="sales" columns={[['id','Identificador','number'],['customer_name','Cliente'],['user_email','Responsable'],['status_label','Estado'],['payment_method_label','Medio de pago'],['total','Total','money'],['created_at','Fecha','date']]} /></div>
 
       <section className="surface p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px] md:items-end">
@@ -153,7 +143,9 @@ function SalesHistoryPage() {
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
+      <RecordDrawer record={detail} resource="Venta" onClose={() => setDetail(null)} />
       <DataTable
+        onRowSelect={setDetail}
         columns={columns}
         data={isLoading ? [] : sales}
         emptyMessage={emptyMessage}

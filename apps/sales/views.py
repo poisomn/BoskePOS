@@ -98,6 +98,8 @@ class SaleViewSet(
 
         if status_value:
             queryset = queryset.filter(status=status_value)
+            if status_value == "pending":
+                queryset = queryset.filter(presale_ticket__isnull=True)
         if customer:
             queryset = queryset.filter(customer_id=customer)
         if user:

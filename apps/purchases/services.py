@@ -1,4 +1,7 @@
 from decimal import Decimal
+from types import SimpleNamespace
+import hashlib
+import json
 
 from django.db import transaction
 from django.utils import timezone
@@ -9,7 +12,45 @@ from apps.inventory.services import StockMovementError, apply_stock_movement
 from apps.suppliers.models import Supplier
 from apps.utils.money import validate_money_capacity
 
-from .models import Purchase, PurchaseItem
+from .models import Purchase, PurchaseItem, PurchaseReceipt
+
+
+@transaction.atomic
+def receive_purchase(*, purchase, user, lines, key, notes=''):
+    purchase = Purchase.objects.select_for_update().select_related('supplier').get(pk=purchase.pk)
+    fingerprint = hashlib.sha256(json.dumps({'lines': lines, 'notes': notes}, sort_keys=True, default=str).encode()).hexdigest()
+    previous = PurchaseReceipt.objects.filter(purchase=purchase, key=key).first()
+    if previous:
+        if previous.fingerprint != fingerprint: raise PurchaseConflict('La clave ya se usó para otra recepción.')
+        return get_purchase_for_detail(purchase.pk)
+    if purchase.status not in ('draft', 'partial'): raise PurchaseConflict('Esta compra ya fue recibida o anulada.')
+    _validate_supplier(purchase.supplier)
+    rows = {line.pk: line for line in purchase.items.all()}
+    ids = [line['item_id'] for line in lines]
+    if not lines or len(ids) != len(set(ids)) or any(pk not in rows for pk in ids):
+        raise ValidationError({'lines': 'Selecciona líneas válidas, sin repetir, de esta compra.'})
+    products = {p.pk: p for p in Product.objects.select_for_update().filter(pk__in=[rows[pk].product_id for pk in ids]).order_by('pk')}
+    for incoming in lines:
+        line = rows[incoming['item_id']]
+        quantity = incoming['quantity']
+        product = products[line.product_id]
+        if quantity <= 0 or line.received_quantity + quantity > line.quantity:
+            raise ValidationError({'lines': f'La recepción supera lo pendiente de {line.product_name}.'})
+        if not product.is_active: raise ValidationError({'lines': f'Producto inactivo: {line.product_name}.'})
+        cost = incoming.get('unit_cost', line.unit_cost)
+        _update_weighted_average_cost(product=product, item=SimpleNamespace(quantity=quantity, unit_cost=cost))
+        apply_stock_movement(product=product, movement_type=StockMovement.MovementType.ENTRY, quantity=quantity,
+                             user=user, reason=f'Recepción de compra #{purchase.pk}', reference=f'purchase:{purchase.pk}')
+        line.received_quantity += quantity
+        line.save(update_fields=('received_quantity',))
+    PurchaseReceipt.objects.create(purchase=purchase, user=user, key=key, fingerprint=fingerprint,
+                                    lines=json.loads(json.dumps(lines, default=str)), notes=notes)
+    purchase.status = 'confirmed' if all(row.received_quantity == row.quantity for row in rows.values()) else 'partial'
+    purchase.confirmed_at = timezone.now() if purchase.status == 'confirmed' else None
+    purchase.save(update_fields=('status', 'confirmed_at', 'updated_at'))
+    from apps.sales.presales import audit
+    audit(user, 'purchases.purchase', purchase.pk, 'received', lines=json.loads(json.dumps(lines, default=str)), notes=notes)
+    return get_purchase_for_detail(purchase.pk)
 
 
 class PurchaseConflict(Exception):
@@ -95,46 +136,13 @@ def save_purchase_draft(*, user, supplier, items, reference='', notes='', purcha
 
 @transaction.atomic
 def confirm_purchase(*, purchase, user):
-    purchase = (
-        Purchase.objects.select_for_update()
-        .select_related('supplier', 'user')
-        .prefetch_related('items__product')
-        .get(pk=purchase.pk)
-    )
-
-    if purchase.status == Purchase.Status.CONFIRMED:
-        raise PurchaseConflict('La compra ya esta confirmada.')
-    if purchase.status == Purchase.Status.CANCELLED:
-        raise PurchaseConflict('Una compra anulada no puede confirmarse.')
-
-    items = list(purchase.items.select_related('product').order_by('product_id'))
-    if not items:
-        raise ValidationError({'items': 'La compra debe incluir al menos una linea.'})
-
-    _validate_supplier(purchase.supplier)
-    _recalculate_persisted_purchase(purchase, items)
-
-    for item in items:
-        product = Product.objects.select_for_update().get(pk=item.product_id)
-
-        if not product.is_active:
-            raise ValidationError({'items': f'El producto {item.product_sku} no esta activo.'})
-
-        _update_weighted_average_cost(product=product, item=item)
-        apply_stock_movement(
-            product=product,
-            movement_type=StockMovement.MovementType.ENTRY,
-            quantity=item.quantity,
-            reason=f'Compra #{purchase.id} confirmada',
-            user=user,
-            reference=f'purchase:{purchase.id}',
-        )
-
-    purchase.status = Purchase.Status.CONFIRMED
-    purchase.confirmed_at = timezone.now()
-    purchase.save(update_fields=('status', 'confirmed_at', 'subtotal', 'total', 'updated_at'))
-
-    return get_purchase_for_detail(purchase.pk)
+    from uuid import uuid4
+    purchase = Purchase.objects.select_for_update().get(pk=purchase.pk)
+    if purchase.status not in ('draft', 'partial'):
+        raise PurchaseConflict('La compra ya está confirmada o anulada.')
+    lines = [{'item_id': line.pk, 'quantity': line.quantity-line.received_quantity, 'unit_cost': line.unit_cost}
+             for line in purchase.items.all() if line.received_quantity < line.quantity]
+    return receive_purchase(purchase=purchase, user=user, lines=lines, key=uuid4())
 
 
 @transaction.atomic
@@ -154,11 +162,13 @@ def cancel_purchase(*, purchase, user):
     items = list(purchase.items.select_related('product').order_by('product_id'))
 
     for item in items:
+        if not item.received_quantity:
+            continue
         try:
             apply_stock_movement(
                 product=item.product,
                 movement_type=StockMovement.MovementType.EXIT,
-                quantity=item.quantity,
+                quantity=item.received_quantity,
                 reason=f'Anulacion de compra #{purchase.id}',
                 user=user,
                 reference=f'purchase-cancel:{purchase.id}',

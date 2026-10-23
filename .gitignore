@@ -132,6 +132,7 @@ Thumbs.db
 # ==========================================
 # Propuesta e informes de Proyecto de Título (solo locales)
 # ==========================================
+/local-medicion/
 /frontend/src/pages/Projects/
 /frontend/src/local/
 /scripts/test-proposal.mjs
@@ -147,6 +148,26 @@ Thumbs.db
 
 # Documentos académicos y entregables generados
 /output/
+/outputs/
+/tmp/
+/anexos/
+/informes/
+/documentos/
+
+# Documentos, planillas y paquetes de entrega (conservar solo localmente)
+*.doc
+*.docx
+*.odt
+*.pdf
+*.xls
+*.xlsx
+*.ods
+*.ppt
+*.pptx
+*.odp
+*.zip
+~$*
+
 *Proyecto_de_Titulo*
 *Proyecto_de_Título*
 *Proyecto de Titulo*

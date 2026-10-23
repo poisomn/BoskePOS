@@ -1,3 +1,4 @@
+import ReceivePurchase, { ReceiptHistory } from './ReceivePurchase'
 import { useCallback, useEffect, useState } from 'react'
 import { FiArrowLeft, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -6,7 +7,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { useAuth } from '../../hooks/useAuth'
 import { cancelPurchase, confirmPurchase, getPurchase } from '../../services/purchasesService'
 import { getApiErrorMessage } from '../../utils/apiErrors'
-import { formatDateTime, formatMoney } from '../../utils/formatters'
+import { formatDateTime, formatMoney, formatNumber } from '../../utils/formatters'
 
 function PurchaseDetailPage() {
   const navigate = useNavigate()
@@ -79,6 +80,7 @@ function PurchaseDetailPage() {
 
   return (
     <div className="w-full space-y-6">
+      {['draft', 'partial'].includes(purchase.status) && hasPermission('purchases:confirm') && <ReceivePurchase purchase={purchase} onSaved={value => { setPurchase(value); setSuccessMessage('Recepción registrada. Solo se ingresaron las cantidades recibidas.') }} />}
       <section className="surface p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -95,13 +97,13 @@ function PurchaseDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            {purchase.status === 'draft' && hasPermission('purchases:confirm') ? (
+            {['draft', 'partial'].includes(purchase.status) && hasPermission('purchases:confirm') ? (
               <button className="btn btn-primary" onClick={() => setConfirmOpen(true)} type="button">
                 <FiCheckCircle aria-hidden="true" />
                 Confirmar
               </button>
             ) : null}
-            {purchase.status === 'confirmed' && hasPermission('purchases:cancel') ? (
+            {['confirmed', 'partial'].includes(purchase.status) && hasPermission('purchases:cancel') ? (
               <button className="btn btn-danger" onClick={() => setCancelOpen(true)} type="button">
                 <FiXCircle aria-hidden="true" />
                 Anular
@@ -137,7 +139,7 @@ function PurchaseDetailPage() {
               <tr key={item.id}>
                 <td>{item.product_name}</td>
                 <td>{item.product_sku}</td>
-                <td>{item.quantity}</td>
+                <td>{formatNumber(item.quantity)}<small className="block section-note">Recibido {formatNumber(item.received_quantity)} · pendiente {formatNumber(item.quantity-item.received_quantity)}</small></td>
                 <td>{formatMoney(item.unit_cost)}</td>
                 <td>{formatMoney(item.line_total)}</td>
               </tr>
@@ -155,6 +157,7 @@ function PurchaseDetailPage() {
         </section>
       ) : null}
 
+      <ReceiptHistory purchase={purchase} />
       <ConfirmDialog
         confirmLabel="Confirmar"
         description="Esta accion generara movimientos de entrada y aumentara el stock."

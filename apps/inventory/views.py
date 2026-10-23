@@ -82,6 +82,22 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
+    @action(detail=False, methods=('get',))
+    def replenishment(self, request):
+        from django.db.models import F, OuterRef, Subquery
+        from apps.purchases.models import PurchaseItem
+        usual = PurchaseItem.objects.filter(product_id=OuterRef('pk'), purchase__status__in=('confirmed', 'partial'),
+            received_quantity__gt=0, purchase__supplier__is_active=True).order_by('-purchase__created_at', '-pk')
+        products = self.get_queryset().filter(is_active=True).filter(Q(stock__lt=F('minimum_stock')) | Q(stock=0)).annotate(
+            usual_supplier_id=Subquery(usual.values('purchase__supplier_id')[:1]),
+            usual_supplier_name=Subquery(usual.values('purchase__supplier__name')[:1]))
+        page = self.paginate_queryset(products)
+        data = ProductSerializer(page, many=True, context={'request': request}).data
+        for row, product in zip(data, page):
+            row['usual_supplier_id'] = product.usual_supplier_id
+            row['usual_supplier_name'] = product.usual_supplier_name
+        return self.get_paginated_response(data)
+
     @action(detail=True, methods=('get',), url_path='monthly-activity')
     def monthly_activity(self, request, pk=None):
         from datetime import date

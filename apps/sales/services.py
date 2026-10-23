@@ -136,9 +136,12 @@ def update_pending_sale(
     discount_reason=UNSET,
     authorizer=None,
     idempotency_key=None,
+    from_presale=False,
 ):
     authorizer = lock_operation_users(user, authorizer)
     sale = Sale.objects.select_for_update().get(pk=sale.pk)
+    if not from_presale and hasattr(sale, "presale_ticket"):
+        raise SaleConflict("Esta venta pertenece a una preventa. Usa la cola de tickets.")
 
     if sale.status != Sale.Status.PENDING:
         raise SaleConflict('Solo se puede editar una venta pendiente.')
@@ -210,6 +213,7 @@ def complete_sale(
     notes=None,
     idempotency_key=None,
     authorizer=None,
+    from_presale=False,
 ):
     authorizer = lock_operation_users(user, authorizer)
     sale = (
@@ -217,6 +221,9 @@ def complete_sale(
         .prefetch_related('items__product')
         .get(pk=sale.pk)
     )
+
+    if not from_presale and hasattr(sale, "presale_ticket"):
+        raise SaleConflict("Cobra este ticket desde la caja de preventas.")
 
     if sale.status == Sale.Status.COMPLETED and idempotency_key and sale.completion_key == idempotency_key and sale.cashier_id == user.pk:
         payment = _build_payment(status=Sale.Status.COMPLETED, total=sale.total, payment_method=payment_method, amount_paid=amount_paid)
@@ -350,6 +357,8 @@ def cancel_sale(*, sale, user):
 def discard_pending_sale(*, sale):
     sale = Sale.objects.select_for_update().get(pk=sale.pk)
 
+    if hasattr(sale, "presale_ticket"):
+        raise SaleConflict("Las preventas se cancelan con motivo; no se eliminan.")
     if sale.status != Sale.Status.PENDING:
         raise SaleConflict('Solo se pueden eliminar ventas suspendidas.')
 

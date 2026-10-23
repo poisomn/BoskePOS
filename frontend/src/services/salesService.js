@@ -37,7 +37,7 @@ export async function listSales() {
   return normalizeListResponse(data)
 }
 
-export async function listSalesPage({ page = 1, pageSize = 10, search = '', status = '' } = {}) {
+export async function listSalesPage({ page = 1, pageSize = 10, search = '', status = '', customer = '', dateFrom = '', dateTo = '' } = {}) {
   const params = {
     page,
     page_size: pageSize,
@@ -45,6 +45,9 @@ export async function listSalesPage({ page = 1, pageSize = 10, search = '', stat
 
   if (search) params.search = search
   if (status) params.status = status
+  if (customer) params.customer = customer
+  if (dateFrom) params.date_from = dateFrom
+  if (dateTo) params.date_to = dateTo
 
   const { data } = await http.get('/sales/sales/', { params })
   return normalizePaginatedResponse(data)

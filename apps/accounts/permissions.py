@@ -8,6 +8,7 @@ SELLER_ROLE = 'vendedor'
 INVENTORY_ROLE = 'encargado_inventario'
 
 ROLE_LABELS = {
+    'cajero': 'Cajero',
     ADMIN_ROLE: 'Administrador',
     SELLER_ROLE: 'Vendedor',
     INVENTORY_ROLE: 'Encargado de inventario',
@@ -15,6 +16,7 @@ ROLE_LABELS = {
 
 ROLE_PERMISSIONS = {
     ADMIN_ROLE: frozenset({
+        'presales:read', 'presales:write',
         'inventory:read',
         'inventory:write',
         'inventory:adjust_stock',
@@ -37,6 +39,7 @@ ROLE_PERMISSIONS = {
         'settings:write',
     }),
     SELLER_ROLE: frozenset({
+        'presales:read', 'presales:write',
         'inventory:read',
         'customers:read',
         'customers:write',
@@ -44,6 +47,7 @@ ROLE_PERMISSIONS = {
         'sales:write',
         'sales:complete',
     }),
+    'cajero': frozenset({'presales:read', 'inventory:read', 'customers:read', 'sales:read', 'sales:complete'}),
     INVENTORY_ROLE: frozenset({
         'inventory:read',
         'inventory:write',
@@ -175,6 +179,7 @@ class InventoryPermission(ActionPermission):
         'activate': 'inventory:write',
         'deactivate': 'inventory:write',
         'adjust_stock': 'inventory:adjust_stock',
+        'replenishment': 'purchases:write',
     }
 
 
@@ -239,6 +244,7 @@ class PurchasePermission(ActionPermission):
         'partial_update': 'purchases:write',
         'destroy': 'purchases:write',
         'confirm': 'purchases:confirm',
+        'receive': 'purchases:confirm',
         'cancel': 'purchases:cancel',
     }
 

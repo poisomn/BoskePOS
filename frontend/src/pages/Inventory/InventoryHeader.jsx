@@ -2,7 +2,7 @@ import { FiSearch } from 'react-icons/fi'
 
 function InventoryHeader({ actionLabel, canCreate = true, onAction, onSearchChange, search, subtitle, title }) {
   return (
-    <section className="surface p-5">
+    <section className="ops-inventory-heading">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
@@ -15,7 +15,7 @@ function InventoryHeader({ actionLabel, canCreate = true, onAction, onSearchChan
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="relative min-w-72">
+          <label className="relative w-full sm:min-w-64">
             <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-steel-500)' }} />
             <input
               className="input pl-10"

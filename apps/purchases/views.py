@@ -1,5 +1,5 @@
 from django.db.models import Q
-from rest_framework import filters, status, viewsets
+from rest_framework import serializers, filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -91,6 +91,26 @@ class PurchaseViewSet(viewsets.ModelViewSet):
         except PurchaseConflict as exc:
             return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=('post',))
+    def receive(self, request, pk=None):
+        class Line(serializers.Serializer):
+            item_id = serializers.IntegerField(min_value=1)
+            quantity = serializers.IntegerField(min_value=1)
+            unit_cost = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0)
+        class Input(serializers.Serializer):
+            lines = Line(many=True, allow_empty=False)
+            idempotency_key = serializers.UUIDField()
+            notes = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+        serializer = Input(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        from .services import receive_purchase
+        try:
+            result = receive_purchase(purchase=self.get_object(), user=request.user, lines=serializer.validated_data['lines'],
+                key=serializer.validated_data['idempotency_key'], notes=serializer.validated_data.get('notes', ''))
+        except PurchaseConflict as exc:
+            return Response({'detail': exc.message}, status=status.HTTP_409_CONFLICT)
+        return Response(PurchaseSerializer(result).data)
 
     @action(detail=True, methods=('post',))
     def confirm(self, request, pk=None):

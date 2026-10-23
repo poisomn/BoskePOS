@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { businessToday, shiftDate } from '../../utils/dateRanges'
+import DateRangePicker from '../../components/DateRangePicker'
+import { Link } from 'react-router-dom'
+import { PageHeading } from '../../components/OperationsUI'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FiAlertTriangle,
@@ -32,13 +36,12 @@ const periodOptions = [
   { key: 'today', label: 'Hoy', days: 1 },
   { key: '7d', label: '7 dias', days: 7 },
   { key: '30d', label: '30 dias', days: 30 },
-  { key: 'custom', label: 'Rango personalizado' },
 ]
 
 function DashboardPage() {
   const navigate = useNavigate()
   const { hasPermission, user } = useAuth()
-  const today = useMemo(() => getLocalDateInputValue(), [])
+  const today = useMemo(() => businessToday(), [])
   const [periodMode, setPeriodMode] = useState('today')
   const [dateFrom, setDateFrom] = useState(today)
   const [dateTo, setDateTo] = useState(today)
@@ -46,8 +49,10 @@ function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [summary, setSummary] = useState(null)
   const displayName = getDisplayName(user)
+  const requestSequence = useRef(0)
 
   const fetchSummary = useCallback(async (range) => {
+    const requestId = ++requestSequence.current
     setIsLoading(true)
     setError('')
 
@@ -57,12 +62,11 @@ function DashboardPage() {
         dateTo: range.dateTo,
         limit: RECENT_LIMIT,
       })
-      setSummary(data)
+      if (requestId === requestSequence.current) setSummary(data)
     } catch (requestError) {
-      setSummary(null)
-      setError(getApiErrorMessage(requestError, 'No se pudo cargar el dashboard.'))
+      if (requestId === requestSequence.current) { setSummary(null); setError(getApiErrorMessage(requestError, 'No se pudo cargar el dashboard.')) }
     } finally {
-      setIsLoading(false)
+      if (requestId === requestSequence.current) setIsLoading(false)
     }
   }, [])
 
@@ -125,104 +129,45 @@ function DashboardPage() {
 
   return (
     <div className="w-full space-y-6">
-      <DashboardHeader
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        displayName={displayName}
-        isLoading={isLoading}
-        onDateFromChange={setDateFrom}
-        onDateToChange={setDateTo}
-        onPeriodChange={applyPeriod}
-        onSubmit={handleSubmit}
-        periodMode={periodMode}
-      />
-
+      <PageHeading section="Dashboard" title="Así va tu ferretería" description="Una mirada clara a tus ventas, inventario y próximos pasos.">
+        {hasPermission('presales:write') && <Link className="btn btn-primary" to="/presales">Nueva preventa</Link>}
+      </PageHeading>
+      <DashboardHeader dateFrom={dateFrom} dateTo={dateTo} displayName={displayName} isLoading={isLoading}
+        onRangeChange={({ from, to }) => { setDateFrom(from); setDateTo(to); setPeriodMode('custom'); fetchSummary({ dateFrom: from, dateTo: to }) }} onPeriodChange={applyPeriod} onSubmit={handleSubmit} periodMode={periodMode} />
       {error ? <ErrorState message={error} onRetry={() => fetchSummary({ dateFrom, dateTo })} /> : null}
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard icon={FiCreditCard} isLoading={isLoading} label="Ticket promedio" note="Ventas / transacciones" unavailable={!hasPermission('sales:read')} value={summary?.sales?.average_ticket != null ? formatMoney(summary.sales.average_ticket) : 'Sin ventas'} />
-        <KpiCard icon={FiUser} isLoading={isLoading} label="Clientes identificados" note="Clientes únicos del período" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.identified_customers) : '-'} />
-        <KpiCard icon={FiShoppingCart} isLoading={isLoading} label="Transacciones anónimas" note="No equivalen a personas únicas" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.anonymous_transactions) : '-'} />
-        <KpiCard
-          icon={FiTrendingUp}
-          isLoading={isLoading}
-          label="Ventas del periodo"
-          note={formatPeriod(summary)}
-          unavailable={!hasPermission('sales:read')}
-          value={summary?.sales ? formatMoney(summary.sales.total) : '-'}
-        />
-        <KpiCard
-          icon={FiCreditCard}
-          isLoading={isLoading}
-          label="Cantidad de ventas"
-          note="Solo ventas completadas"
-          unavailable={!hasPermission('sales:read')}
-          value={summary?.sales ? formatInteger(summary.sales.count) : '-'}
-        />
-        <KpiCard
-          icon={FiAlertTriangle}
-          isLoading={isLoading}
-          label="Stock bajo"
-          note="Productos activos bajo minimo"
-          tone="warning"
-          unavailable={!hasPermission('inventory:read')}
-          value={summary?.inventory ? formatInteger(summary.inventory.low_stock_count) : '-'}
-        />
-        <KpiCard
-          icon={FiPackage}
-          isLoading={isLoading}
-          label="Sin stock"
-          note="Productos activos con stock cero"
-          tone="danger"
-          unavailable={!hasPermission('inventory:read')}
-          value={summary?.inventory ? formatInteger(summary.inventory.out_of_stock_count) : '-'}
-        />
+      <section className="ops-dashboard-kpis">
+        <KpiCard icon={FiTrendingUp} isLoading={isLoading} label="Ventas del período" note={formatPeriod(summary)} unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatMoney(summary.sales.total) : '—'} />
+        <KpiCard icon={FiCreditCard} isLoading={isLoading} label="Ticket promedio" note="Ventas completadas / transacciones" unavailable={!hasPermission('sales:read')} value={summary?.sales?.average_ticket != null ? formatMoney(summary.sales.average_ticket) : 'Sin ventas'} />
+        <KpiCard icon={FiShoppingCart} isLoading={isLoading} label="Preventas por cobrar" note="Cola actual · aún no son ingresos" unavailable={!hasPermission('presales:read')} value={summary?.presales ? formatInteger(summary.presales.pending_count) : '—'} />
+        <KpiCard icon={FiPackage} isLoading={isLoading} label="Productos por reponer" note="Productos activos bajo mínimo" unavailable={!hasPermission('inventory:read')} value={summary?.inventory ? formatInteger(summary.inventory.low_stock_count) : '—'} />
       </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <SalesBarChart
-          isLoading={isLoading}
-          period={summary?.period}
-          sales={summary?.sales}
-          unavailable={!hasPermission('sales:read')}
-        />
-        <InventoryHealthChart
-          inventory={summary?.inventory}
-          isLoading={isLoading}
-          unavailable={!hasPermission('inventory:read')}
-        />
+      <section className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <SalesBarChart isLoading={isLoading} period={summary?.period} sales={summary?.sales} unavailable={!hasPermission('sales:read')} />
+        <InventoryHealthChart inventory={summary?.inventory} isLoading={isLoading} unavailable={!hasPermission('inventory:read')} />
       </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <RecentSalesTable
-          isLoading={isLoading}
-          sales={summary?.sales?.recent ?? []}
-          unavailable={!hasPermission('sales:read')}
-        />
-        <TopProductsPanel products={summary?.sales?.top_products ?? []} />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <RecentPurchasesTable
-          isLoading={isLoading}
-          purchases={summary?.purchases?.recent ?? []}
-          unavailable={!hasPermission('purchases:read')}
-        />
-        <RecentStockMovementsTable
-          isLoading={isLoading}
-          movements={summary?.stock_movements?.recent ?? []}
-          unavailable={!hasPermission('stock_movements:read')}
-        />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
-        <InventoryAlerts
-          inventory={summary?.inventory}
-          isLoading={isLoading}
-          unavailable={!hasPermission('inventory:read')}
-        />
+      <section className="surface p-5 space-y-4"><div><h2 className="section-title">Tu atención hace la diferencia</h2><p className="section-note">Pendientes que puedes resolver ahora.</p></div><div className="ops-tasks">
+        {hasPermission('inventory:read') && <Link to={hasPermission('purchases:write') ? '/inventory/replenishment' : '/inventory/products?low_stock=true'}><FiPackage size={22} /><div><strong>Revisar reposición</strong><small>{summary?.inventory ? formatInteger(summary.inventory.out_of_stock_count) : '—'} productos sin stock. Preparar una compra.</small></div></Link>}
+        {hasPermission('purchases:read') && <Link to="/purchases"><FiShoppingBag size={22} /><div><strong>Abastecimiento y recepciones</strong><small>Revisar borradores, cantidades pendientes y recepciones.</small></div></Link>}
+        {hasPermission('sales:complete') && <Link to="/checkout"><FiCreditCard size={22} /><div><strong>Atender preventas</strong><small>{summary?.presales ? formatInteger(summary.presales.pending_count) : '—'} tickets pendientes en caja de venta.</small></div></Link>}
+      </div></section>
+      <section className="grid gap-6 xl:grid-cols-[1.3fr_1fr]"><RecentSalesTable isLoading={isLoading} sales={summary?.sales?.recent ?? []} unavailable={!hasPermission('sales:read')} /><TopProductsPanel products={summary?.sales?.top_products ?? []} /></section>
+      <section className="space-y-5 border-t pt-7" aria-labelledby="dashboard-details-title">
+        <div><p className="text-xs font-semibold text-[var(--primary)]">DETALLE OPERATIVO</p><h2 id="dashboard-details-title" className="section-title mt-1">Estadísticas y actividad de tu negocio</h2><p className="section-note mt-2">Ventas según el período seleccionado. Inventario y últimas operaciones muestran la situación actual.</p></div>
+        <div className="ops-dashboard-kpis">
+          <KpiCard icon={FiCreditCard} isLoading={isLoading} label="Cantidad de ventas" note="Completadas en el período" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.count) : '—'} />
+          <KpiCard icon={FiUser} isLoading={isLoading} label="Clientes identificados" note="Personas o empresas únicas del período" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.identified_customers) : '—'} />
+          <KpiCard icon={FiShoppingCart} isLoading={isLoading} label="Transacciones anónimas" note="No equivalen a personas únicas" unavailable={!hasPermission('sales:read')} value={summary?.sales ? formatInteger(summary.sales.anonymous_transactions) : '—'} />
+          <KpiCard icon={FiAlertTriangle} isLoading={isLoading} label="Stock bajo" note="Stock positivo igual o inferior al mínimo · actual" tone="warning" unavailable={!hasPermission('inventory:read')} value={summary?.inventory ? formatInteger(summary.inventory.low_stock_count) : '—'} />
+          <KpiCard icon={FiPackage} isLoading={isLoading} label="Productos sin stock" note="Productos activos con saldo cero · actual" tone="danger" unavailable={!hasPermission('inventory:read')} value={summary?.inventory ? formatInteger(summary.inventory.out_of_stock_count) : '—'} />
+          <KpiCard icon={FiPackage} isLoading={isLoading} label="Catálogo activo" note="Productos activos · actual" unavailable={!hasPermission('inventory:read')} value={summary?.inventory ? formatInteger(summary.inventory.active_count) : '—'} />
+          <KpiCard icon={FiPackage} isLoading={isLoading} label="Stock saludable" note="Productos por encima del mínimo · actual" unavailable={!hasPermission('inventory:read')} value={summary?.inventory ? formatInteger(summary.inventory.healthy_stock_count) : '—'} />
+          <KpiCard icon={FiShoppingCart} isLoading={isLoading} label="Importe pendiente de preventas" note="Cola actual · no es ingreso registrado" unavailable={!hasPermission('presales:read')} value={summary?.presales ? formatMoney(summary.presales.pending_total) : '—'} />
+        </div><div className="grid gap-5 xl:grid-cols-2">
+        <RecentPurchasesTable isLoading={isLoading} purchases={summary?.purchases?.recent ?? []} unavailable={!hasPermission('purchases:read')} />
+        <RecentStockMovementsTable isLoading={isLoading} movements={summary?.stock_movements?.recent ?? []} unavailable={!hasPermission('stock_movements:read')} />
+        <InventoryAlerts inventory={summary?.inventory} isLoading={isLoading} unavailable={!hasPermission('inventory:read')} />
         <QuickActions actions={quickActions} user={user} />
-      </section>
+      </div></section>
     </div>
   )
 }
@@ -232,22 +177,21 @@ function DashboardHeader({
   dateTo,
   displayName,
   isLoading,
-  onDateFromChange,
-  onDateToChange,
+  onRangeChange,
   onPeriodChange,
   onSubmit,
   periodMode,
 }) {
   return (
-    <section className="surface p-5">
+    <section className="ops-dashboard-hero">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold" style={{ color: 'var(--color-brand-700)' }}>
             Dashboard operativo
           </p>
-          <h1 className="mt-1 text-2xl font-semibold">Bienvenido, {displayName}</h1>
+          <h2 className="mt-1 text-2xl font-semibold">Hola, {displayName}</h2>
           <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Indicadores calculados por el backend para revisar ventas, inventario y actividad reciente.
+            Tu operación en orden, desde el mesón hasta la caja.
           </p>
         </div>
 
@@ -264,33 +208,8 @@ function DashboardHeader({
               </button>
             ))}
           </div>
-          <div className="grid gap-3 sm:grid-cols-[155px_155px_auto]">
-            <label>
-              <span className="field-label">Desde</span>
-              <input
-                className="input"
-                max={dateTo}
-                onChange={(event) => {
-                  onDateFromChange(event.target.value)
-                  onPeriodChange({ key: 'custom' })
-                }}
-                type="date"
-                value={dateFrom}
-              />
-            </label>
-            <label>
-              <span className="field-label">Hasta</span>
-              <input
-                className="input"
-                min={dateFrom}
-                onChange={(event) => {
-                  onDateToChange(event.target.value)
-                  onPeriodChange({ key: 'custom' })
-                }}
-                type="date"
-                value={dateTo}
-              />
-            </label>
+          <div className="grid gap-3 sm:grid-cols-[minmax(240px,1fr)_auto]">
+            <DateRangePicker from={dateFrom} to={dateTo} maxDays={31} disabled={isLoading} onChange={onRangeChange} />
             <button className="btn btn-primary self-end" disabled={isLoading} type="submit">
               <FiRefreshCw aria-hidden="true" className={isLoading ? 'animate-spin' : ''} />
               Actualizar
@@ -319,7 +238,7 @@ function KpiCard({ icon: Icon, isLoading, label, note, tone = 'neutral', unavail
           {isLoading ? (
             <Skeleton className="mt-3 h-8 w-28" />
           ) : (
-            <p className="mt-2 truncate text-2xl font-semibold">
+            <p className="ops-kpi-value mt-2 truncate text-2xl font-semibold">
               {unavailable ? 'Sin permiso' : value}
             </p>
           )}
@@ -338,7 +257,7 @@ function KpiCard({ icon: Icon, isLoading, label, note, tone = 'neutral', unavail
   )
 }
 
-function SalesBarChart({ isLoading, sales, unavailable }) {
+export function SalesBarChart({ isLoading, sales, unavailable }) {
   const chartData = useMemo(() => {
     if (!sales?.daily || unavailable) {
       return []
@@ -395,7 +314,7 @@ function SalesBarChart({ isLoading, sales, unavailable }) {
   )
 }
 
-function InventoryHealthChart({ inventory, isLoading, unavailable }) {
+export function InventoryHealthChart({ inventory, isLoading, unavailable }) {
   const pieData = useMemo(() => {
     if (!inventory || unavailable) {
       return []
@@ -509,6 +428,7 @@ function RecentStockMovementsTable({ isLoading, movements, unavailable }) {
       <RecentTable
         columns={['Producto', 'Tipo', 'Cantidad', 'Saldo', 'Fecha']}
         emptyMessage="No hay movimientos recientes."
+        rowKeys={movements.map(movement => movement.id)}
         rows={movements.map((movement) => [
           `${movement.product} (${movement.sku})`,
           movement.movement_type_label,
@@ -639,7 +559,7 @@ function DashboardPanel({ children, icon: Icon, isLoading = false, subtitle = ''
   )
 }
 
-function RecentTable({ columns, emptyMessage, rows }) {
+function RecentTable({ columns, emptyMessage, rows, rowKeys }) {
   if (!rows.length) {
     return <EmptyState message={emptyMessage} />
   }
@@ -653,8 +573,8 @@ function RecentTable({ columns, emptyMessage, rows }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={String(row[0])}>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowKeys?.[rowIndex] ?? String(row[0])}>
               {row.map((cell, index) => <td key={`${row[0]}-${index}`}>{cell}</td>)}
             </tr>
           ))}
@@ -801,25 +721,8 @@ function getDisplayName(user) {
 }
 
 function getRangeForDays(days) {
-  const endDate = new Date()
-  const startDate = new Date()
-  startDate.setDate(endDate.getDate() - (days - 1))
-
-  return {
-    dateFrom: formatDateInputValue(startDate),
-    dateTo: formatDateInputValue(endDate),
-  }
-}
-
-function getLocalDateInputValue() {
-  return formatDateInputValue(new Date())
-}
-
-function formatDateInputValue(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  const dateTo = businessToday()
+  return { dateFrom: shiftDate(dateTo, -(days - 1)), dateTo }
 }
 
 export default DashboardPage

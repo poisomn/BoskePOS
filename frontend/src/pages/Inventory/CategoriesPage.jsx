@@ -1,3 +1,4 @@
+import { PageStats, RecordDrawer, DensityControl } from '../../components/OperationsUI'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiEdit2, FiPower, FiRefreshCw } from 'react-icons/fi'
 
@@ -22,6 +23,7 @@ const PAGE_SIZE = 8
 function CategoriesPage() {
   const { hasPermission } = useAuth()
   const canWriteInventory = hasPermission('inventory:write')
+  const [detail, setDetail] = useState(null)
   const [categories, setCategories] = useState([])
   const [editingCategory, setEditingCategory] = useState(null)
   const [categoryToDeactivate, setCategoryToDeactivate] = useState(null)
@@ -227,9 +229,10 @@ function CategoriesPage() {
         onSearchChange={handleSearchChange}
         search={search}
         subtitle="Administra familias de productos para ordenar el catalogo."
-        title="Categorias"
+        title="Un catálogo más ordenado"
       />
 
+      <div className="ops-category-cards">{categories.slice(0, 4).map(category => <button type="button" key={category.id} onClick={() => handleSearchChange(category.name)}><span>CATEGORÍA</span><strong>{category.name}</strong><span>{category.description || (category.is_active ? 'Activa' : 'Inactiva')}</span></button>)}</div>
       <section className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
         <label className="w-full sm:max-w-64">
           <span className="field-label">Estado</span>
@@ -248,7 +251,11 @@ function CategoriesPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
+      <PageStats total={total} rows={categories} resource="categorías" />
+      <div className="ops-table-top"><DensityControl /></div>
+      <RecordDrawer record={detail} resource="Categoría" onClose={() => setDetail(null)} />
       <DataTable
+        onRowSelect={setDetail}
         columns={columns}
         data={isLoading ? [] : categories}
         emptyMessage={emptyMessage}

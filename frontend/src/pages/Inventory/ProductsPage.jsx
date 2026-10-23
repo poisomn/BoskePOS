@@ -1,3 +1,6 @@
+import DateRangePicker from '../../components/DateRangePicker'
+import { Link } from 'react-router-dom'
+import { PageStats, RecordDrawer, DensityControl } from '../../components/OperationsUI'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiEdit2, FiPackage, FiPower, FiRefreshCw } from 'react-icons/fi'
 
@@ -36,6 +39,7 @@ const MOVEMENT_TYPES = [
 const DECREASE_MOVEMENTS = new Set(['exit', 'negative_adjustment', 'internal_use', 'waste'])
 
 function ProductsPage() {
+  const [detail, setDetail] = useState(null)
   const [activity, setActivity] = useState(null)
   const { hasPermission } = useAuth()
   const canAdjustStock = hasPermission('inventory:adjust_stock')
@@ -60,7 +64,7 @@ function ProductsPage() {
   const [isActiveFilter, setIsActiveFilter] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [isLowStockFilter, setIsLowStockFilter] = useState(false)
+  const [isLowStockFilter, setIsLowStockFilter] = useState(() => new URLSearchParams(window.location.search).get('low_stock') === 'true')
   const [isMovementsLoading, setIsMovementsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [movementError, setMovementError] = useState('')
@@ -386,7 +390,7 @@ function ProductsPage() {
           <div>
             {canViewMovements ? <button className="text-left font-semibold underline decoration-dotted" onClick={() => setActivity(product)}>{product.name}</button> : <p className="font-semibold">{product.name}</p>}
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {product.brand || 'Sin marca'}
+              {product.sku} · {product.brand || 'Sin marca'}
             </p>
           </div>
         </div>
@@ -522,7 +526,7 @@ function ProductsPage() {
         onSearchChange={handleSearchChange}
         search={search}
         subtitle="Administra productos, stock, precios, SKU y codigos de barras."
-        title="Productos"
+        title="Tu catálogo, bajo control"
       />
 
       <section className="surface p-5">
@@ -619,7 +623,12 @@ function ProductsPage() {
       {successMessage ? <div className="alert alert-success">{successMessage}</div> : null}
 
       <MonthlyActivity product={activity} onClose={() => setActivity(null)} />
+      <PageStats total={total} rows={products} resource="productos" />
+      <div className="ops-table-top"><DensityControl />{hasPermission('purchases:write') && <Link className="btn btn-primary" to="/inventory/replenishment">Preparar reposición sugerida</Link>}</div>
+      <RecordDrawer record={detail} resource="Producto" onClose={() => setDetail(null)} />
       <DataTable
+        onRowSelect={setDetail}
+        defaultHidden={['sku', 'barcode', 'cost_price', 'tax_rate']}
         columns={columns}
         data={isLoading ? [] : products}
         emptyMessage={emptyMessage}
@@ -765,24 +774,7 @@ function ProductsPage() {
                 ))}
               </select>
             </label>
-            <label>
-              <span className="field-label">Desde</span>
-              <input
-                className="input"
-                onChange={(event) => handleMovementDateFromChange(event.target.value)}
-                type="date"
-                value={movementDateFrom}
-              />
-            </label>
-            <label>
-              <span className="field-label">Hasta</span>
-              <input
-                className="input"
-                onChange={(event) => handleMovementDateToChange(event.target.value)}
-                type="date"
-                value={movementDateTo}
-              />
-            </label>
+            <DateRangePicker label="Fechas de movimientos" from={movementDateFrom} to={movementDateTo} clearable onChange={({ from, to }) => { handleMovementDateFromChange(from); handleMovementDateToChange(to) }} />
           </div>
         </div>
 

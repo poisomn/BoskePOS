@@ -58,6 +58,7 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             'product_sku',
             'product_barcode',
             'quantity',
+            'received_quantity',
             'unit_cost',
             'line_total',
         )
@@ -65,6 +66,12 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
 
 
 class PurchaseSerializer(serializers.ModelSerializer):
+    receipts = serializers.SerializerMethodField()
+
+    def get_receipts(self, obj):
+        return [{'id': receipt.pk, 'user': receipt.user.email, 'created_at': receipt.created_at, 'notes': receipt.notes, 'lines': receipt.lines}
+                for receipt in obj.receipts.select_related('user').all()]
+
     items = PurchaseItemSerializer(many=True, read_only=True)
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
     supplier_rut = serializers.CharField(source='supplier.rut', read_only=True, allow_null=True)
@@ -87,6 +94,7 @@ class PurchaseSerializer(serializers.ModelSerializer):
             'subtotal',
             'total',
             'items',
+            'receipts',
             'confirmed_at',
             'cancelled_at',
             'created_at',
